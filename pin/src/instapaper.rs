@@ -122,8 +122,10 @@ impl Instapaper for Client {
         match val {
             JsonValue::Object(doc) => {
                 let id = doc.get("bookmark_id").context(NoBookmarkId)?; // &JsonValue
+                debug!("Got an id of {:#?}", id);
                 match id {
                     JsonValue::Short(n) => Ok(format!("new bookmark {}", n)),
+                    JsonValue::Number(n) => Ok(format!("new bookmark {}", n)),
                     _ => Err(Error::BadJsonValueType {
                         item: id.clone(),
                         back: Backtrace::generate(),

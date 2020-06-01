@@ -1,0 +1,9 @@
+2020-05-31  Michael Herstine  <sp1ff@pobox.com>
+
+	Prep for initial release:
+	    1. bugfix in parsing JSON returned from Instapaper
+	    2. updated assorted boilerplate
+
+2020-05-30  Michael Herstine  <sp1ff@pobox.com>
+
+	Initial commit

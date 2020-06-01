@@ -1,0 +1,74 @@
+#+TITLE: pin
+#+DESCRIPTION: A command-line Pinboard client
+#+AUTHOR: Michael Herstine
+#+EMAIL: <sp1ff@pobox.com>
+#+DATE: <2020-05-31 Sun 17:46>
+#+AUTODATE: t
+
+* Introduction
+
+[[https://github.com/sp1ff/pin][pin]] is a minimal Rust command-line client for [[https://pinboard.in][Pinboard]] (and [[https://www.instapaper.com][Instapaper]]). It is by no means complete; it supports a few operations which I have found useful. I might add more operations in the future. I have chosen the version number (0.1) in the hopes of conveying that this is a preliminary release.
+
+Here are a few examples of what you can do with [[https://github.com/sp1ff/pin][pin]]:
+
+You can send a link to [[https://pinboard.in][Pinboard]] with tags =a=, =b= & =c=:
+ 
+#+BEGIN_SRC bash
+$> pin send -t a -t b -t c "http://foo.com/bar | splat"
+#+END_SRC
+
+You can setup canned tag clouds you use repeatedly & refer to them by name:
+
+#+BEGIN_SRC bash
+$> cat ~/.pin
+token = "you:XXX"
+
+[targets]
+
+[targets.frobnitz]
+tags = ["@review", "frobinate"]
+read_later = true
+...
+# This link will get tags @review & frobinate, and have the "read later" flag set:
+$> pin send -r frobnitz "http://foo.com/bar | splat"
+#+END_SRC
+
+You can send the link to [[https://www.instapaper.com][Instapaper]] at the same time:
+
+#+BEGIN_SRC bash
+$> pin send -r frobnitz --with-instapaper "http://foo.com/bar | splat"
+#+END_SRC
+
+I began using it for tag maintenance:
+
+#+BEGIN_SRC bash
+$> pin get-tags 
+| Tag                            | Use Count |
++--------------------------------+-----------+
+| flapdoodl                      |         1 |
+| flapdoodle                     |     10000 |
+...
+# Hmmm... likely a mis-spelling
+$> pin rename-tag flapdoodl flapdoodle
+#+END_SRC
+
+Type =pin --help= for a description of all flags & sub-commands.
+
+* Installation
+
+I plan to publish this on [[https://crates.io][crates.io]], but you can also download an Autotools tarball:
+
+#+BEGIN_SRC bash
+cd /tmp
+curl -O https://www.unwoundstack.com/dist/pin-0.1.1.tar.xz
+tar xf pin-0.1.1.tar.xz
+cd pin-0.1.1
+./configure
+make
+make check
+sudo make install
+#+END_SRC
+
+* Discussion
+
+[[https://github.com/sp1ff/pin][pin]] is at this time so simple that I've covered most of what it can do in the examples above. I should note that it is also one of my first Rust projects. Comments, code reviews & complaints welcome at [[mailto:sp1ff@pobo.com][sp1ff@pobox.com]].
