@@ -4,7 +4,14 @@ version = "@PACKAGE_VERSION@"
 authors = ["@PACKAGE_AUTHOR@"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "GPL-3.0-or-later"
+description = "Pinboard (and Instapaper) client"
+homepage = "https://github.com/sp1ff/pin"
+repository = "https://github.com/sp1ff/pin"
+readme = "README.md"
+keywords = ["cli", "pinboard", "utility", "bookmarks"]
+categories = ["command-line-utilities"]
+exclude = ["*~", "Cargo.toml.in", "Makefile.am", "Makefile.in", "Makefile", "vars.rs.in"]
 
 [dependencies]
 boolinator = "2.4.0"
