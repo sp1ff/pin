@@ -67,6 +67,7 @@ error_from!(json::Error);
 error_from!(std::num::ParseIntError);
 error_from!(reqwest::Error);
 error_from!(serde_urlencoded::ser::Error);
+error_from!(std::str::Utf8Error);
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -75,12 +76,16 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Break down the JSON respones body (to /v1/tags/get) into a Vec of (String, usize) tuples
 /// (representing tag name & use count, respectively).
 pub fn counts_for_json(text: &str) -> Result<Vec<(String, usize)>> {
-    let val = json::parse(text)?;
+    debug!("about to parse: ``{}''", text);
+    let res = json::parse(text);
+    debug!("got {:#?}", res);
+    let val = res.unwrap();
     match val {
         JsonValue::Object(doc) => doc
             .iter()
             .map(|(name, value)| match value {
                 JsonValue::Short(s) => Ok((name.to_string(), s.as_str().parse::<usize>()?)),
+                JsonValue::Number(n) => Ok((name.to_string(), n.to_string().parse::<usize>()?)),
                 _ => Err(Error::BadJsonFieldType {
                     name: name.to_string(),
                     item: value.clone(),
@@ -155,10 +160,17 @@ impl Pinboard for Client {
                 status: rsp.status(),
             })?;
 
-        let rsp = rsp.text()?;
-        debug!("requesting {}...done: {}", req, rsp);
+        // Strip the UTF-8 Byte Order Mark, if present, before handing off to the JSON parser
+        let buf = rsp.bytes()?;
+        let buf = if buf[0] == 0xef && buf[1] == 0xbb && buf[2] == 0xbf {
+            buf.slice(3..)
+        } else {
+            buf
+        };
 
-        counts_for_json(&rsp)
+        let rsp = std::str::from_utf8(&buf)?;
+
+        counts_for_json(rsp)
     } // End function `get_all_tags'.
 
     fn rename_tag(&mut self, from: &str, to: &str) -> Result<String> {
@@ -180,10 +192,19 @@ impl Pinboard for Client {
                 status: rsp.status(),
             })?;
 
-        let rsp = rsp.text()?;
+        // Strip the UTF-8 Byte Order Mark, if present, before handing off to the JSON parser
+        let buf = rsp.bytes()?;
+        let buf = if buf[0] == 0xef && buf[1] == 0xbb && buf[2] == 0xbf {
+            buf.slice(3..)
+        } else {
+            buf
+        };
+
+        let rsp = std::str::from_utf8(&buf)?;
+
         debug!("requesting {}...done: {}", req, rsp);
 
-        let val = json::parse(&rsp)?;
+        let val = json::parse(rsp)?;
         match val {
             json::JsonValue::Object(obj) => Ok(obj["result"].to_string()),
             _ => Err(Error::BadJsonType {
@@ -235,10 +256,20 @@ impl Pinboard for Client {
                 ep: String::from(ep),
                 status: rsp.status(),
             })?;
-        let rsp = rsp.text()?;
+
+        // Strip the UTF-8 Byte Order Mark, if present, before handing off to the JSON parser
+        let buf = rsp.bytes()?;
+        let buf = if buf[0] == 0xef && buf[1] == 0xbb && buf[2] == 0xbf {
+            buf.slice(3..)
+        } else {
+            buf
+        };
+
+        let rsp = std::str::from_utf8(&buf)?;
+
         debug!("requesting {}...done: {}", req, rsp);
 
-        let val = json::parse(&rsp)?;
+        let val = json::parse(rsp)?;
         match val {
             json::JsonValue::Object(obj) => Ok(obj["result_code"].to_string()),
             _ => Err(Error::BadJsonType {

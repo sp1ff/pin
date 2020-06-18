@@ -2,7 +2,7 @@
 #+DESCRIPTION: A command-line Pinboard client
 #+AUTHOR: Michael Herstine
 #+EMAIL: <sp1ff@pobox.com>
-#+DATE: <2020-05-31 Sun 17:46>
+#+DATE: <2020-06-17 Wed 18:04>
 #+AUTODATE: t
 
 * Introduction
@@ -56,13 +56,13 @@ Type =pin --help= for a description of all flags & sub-commands.
 
 * Installation
 
-I plan to publish this on [[https://crates.io][crates.io]], but you can also download an Autotools tarball:
+This crate is available on [[https://crates.io][crates.io]], but you can also download an Autotools tarball:
 
 #+BEGIN_SRC bash
 cd /tmp
-curl -O https://www.unwoundstack.com/dist/pin-0.1.1.tar.xz
-tar xf pin-0.1.1.tar.xz
-cd pin-0.1.1
+curl -O https://www.unwoundstack.com/dist/pin-0.1.2.tar.xz
+tar xf pin-0.1.2.tar.xz
+cd pin-0.1.2
 ./configure
 make
 make check

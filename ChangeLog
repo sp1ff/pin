@@ -1,4 +1,15 @@
+2020-06-17  Michael Herstine  <sp1ff@pobox.com>
+
+	BUGFIXES:
+	    1. not sure if this has always been the case, but the Pinboard
+	       API is returning a UTF-8 BOM at the start of the response
+	       text; strip that before parsing
+	    2. the response JSON doesn't always return a Short for use counts;
+	       sometimes it returns a Number-- handle that.
+
 2020-05-31  Michael Herstine  <sp1ff@pobox.com>
+
+	Publishing to crates.io.
 
 	Prep for initial release:
 	    1. bugfix in parsing JSON returned from Instapaper
