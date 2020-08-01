@@ -4,3 +4,6 @@ build-aux
 Makefile.in
 README
 configure
+*.bz2
+*.gz
+*.xz
