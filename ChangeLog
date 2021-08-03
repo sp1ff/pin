@@ -1,5 +1,9 @@
 2021-08-02  Michael Herstine  <sp1ff@pobox.com>
 
+	Update Cargo.toml for packaging.
+
+2021-08-02  Michael Herstine  <sp1ff@pobox.com>
+
 	Repair broken build.
 	The `clap` project released a new beta that broke earlier builds.
 	This commit:
