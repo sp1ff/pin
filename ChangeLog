@@ -1,3 +1,16 @@
+2021-08-02  Michael Herstine  <sp1ff@pobox.com>
+
+	Repair broken build.
+	The `clap` project released a new beta that broke earlier builds.
+	This commit:
+
+	    - updates to *exactly* 3.0.0-beta.2
+	    - updates the copyright statements throughout to 2021
+
+2020-08-01  Michael Herstine  <sp1ff@pobox.com>
+
+	Trivial update to .gitignore-s.
+
 2020-06-17  Michael Herstine  <sp1ff@pobox.com>
 
 	BUGFIXES:

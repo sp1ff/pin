@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Michael Herstine <sp1ff@pobox.com>
+// Copyright (C) 2020-2021 Michael Herstine <sp1ff@pobox.com>
 //
 // This file is part of pin.
 //
@@ -113,17 +113,17 @@ fn add_subcommands(app: clap::App) -> clap::App {
         App::new("get-tags")
             .about("Retrieve all your Pinboard tags along with their use counts")
             .arg(
-                Arg::with_name("alphabetical")
+                Arg::new("alphabetical")
                     .short('a')
                     .about("Sort the output lexicographically"),
             )
             .arg(
-                Arg::with_name("csv")
+                Arg::new("csv")
                     .short('c')
                     .about("Produce output in CSV format"),
             )
             .arg(
-                Arg::with_name("descending")
+                Arg::new("descending")
                     .short('d')
                     .about("Sort the output in descending order of use"),
             ),
@@ -131,14 +131,14 @@ fn add_subcommands(app: clap::App) -> clap::App {
     .subcommand(
         App::new("rename-tag")
             .arg(
-                Arg::with_name("from")
+                Arg::new("from")
                     .about("Source tag (i.e. the tag to be renamed)")
                     .index(1)
                     .requires("to")
                     .required(true),
             )
             .arg(
-                Arg::with_name("to")
+                Arg::new("to")
                     .about("Target tag name (i.e. the new name)")
                     .index(2)
                     .requires("from")
@@ -149,14 +149,14 @@ fn add_subcommands(app: clap::App) -> clap::App {
         App::new("send")
             .about("Send an URL to pinboard (and optionally Instapaper)")
             .arg(
-                Arg::with_name("target")
+                Arg::new("target")
                     .short('r')
                     .long("target")
                     .about("pre-configured target for this link")
                     .takes_value(true),
             )
             .arg(
-                Arg::with_name("tag")
+                Arg::new("tag")
                     .short('t')
                     .long("tag")
                     .about("specify a tag to be applied-- may be given more than once")
@@ -165,39 +165,39 @@ fn add_subcommands(app: clap::App) -> clap::App {
                     .number_of_values(1), // "-t a -t b...", not "-t a b..."
             )
             .arg(
-                Arg::with_name("read-later")
+                Arg::new("read-later")
                     .short('R')
                     .long("read-later")
                     .about("mark this pin as `read later'"),
             )
             .arg(
-                Arg::with_name("title")
+                Arg::new("title")
                     .short('T')
                     .long("title")
                     .about("link title")
                     .takes_value(true),
             )
             .arg(
-                Arg::with_name("url")
+                Arg::new("url")
                     .index(1)
                     .about("URL to be sent to pinboard.in")
                     .required(true),
             )
             .arg(
-                Arg::with_name("instapaper")
+                Arg::new("instapaper")
                     .long("with-instapaper")
                     .short('i')
                     .about("Send this link to Instapaper as well"),
             )
             .arg(
-                Arg::with_name("username")
+                Arg::new("username")
                     .long("username")
                     .short('u')
                     .about("Your Instapaper username")
                     .takes_value(true),
             )
             .arg(
-                Arg::with_name("password")
+                Arg::new("password")
                     .long("password")
                     .short('p')
                     .about("Your Instapaper password")
@@ -220,7 +220,7 @@ fn main() -> Result<(), Error> {
         .about("Send links to Pinboard")
         .long_about("`pin' is a small utility for managing your Pinboard links.")
         .arg(
-            Arg::with_name("config")
+            Arg::new("config")
                 .short('c')
                 .about("specify a configuration file (defaults to ~/.pin")
                 .takes_value(true)
@@ -228,7 +228,7 @@ fn main() -> Result<(), Error> {
                 .default_value(&def_cfg),
         )
         .arg(
-            Arg::with_name("token")
+            Arg::new("token")
                 .short('t')
                 .about("Your pinboard.in API token")
                 .long_about(
@@ -238,17 +238,17 @@ at https://pinboard.in/settings/password.",
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("verbose")
+            Arg::new("verbose")
                 .short('v')
                 .about("Enable verbose output"),
         )
         .arg(
-            Arg::with_name("debug")
+            Arg::new("debug")
                 .short('d')
                 .about("Enable very verbose output"),
         )
         .arg(
-            Arg::with_name("quiet")
+            Arg::new("quiet")
                 .short('q')
                 .about("Suppress all output other than errors"),
         );

@@ -15,7 +15,7 @@ exclude = ["*~", "Cargo.toml.in", "Makefile.am", "Makefile.in", "Makefile", "var
 
 [dependencies]
 boolinator = "2.4.0"
-clap = "3.0.0-beta.1"
+clap = "=3.0.0-beta.2"
 json = "0.12.4"
 log = "0.4.8"
 log4rs = "0.10.0"
