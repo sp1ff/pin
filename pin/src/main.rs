@@ -108,6 +108,11 @@ impl std::fmt::Debug for Error {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                       utility functions                                        //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Add all the [`pin`] sub-commands to `app`.
 fn add_subcommands(app: clap::App) -> clap::App {
     app.subcommand(
         App::new("get-tags")
@@ -115,31 +120,32 @@ fn add_subcommands(app: clap::App) -> clap::App {
             .arg(
                 Arg::new("alphabetical")
                     .short('a')
-                    .about("Sort the output lexicographically"),
+                    .help("Sort the output lexicographically"),
             )
             .arg(
                 Arg::new("csv")
                     .short('c')
-                    .about("Produce output in CSV format"),
+                    .help("Produce output in CSV format"),
             )
             .arg(
                 Arg::new("descending")
                     .short('d')
-                    .about("Sort the output in descending order of use"),
+                    .help("Sort the output in descending order of use"),
             ),
     )
     .subcommand(
         App::new("rename-tag")
+            .about("Rename a tag")
             .arg(
                 Arg::new("from")
-                    .about("Source tag (i.e. the tag to be renamed)")
+                    .help("Source tag (i.e. the tag to be renamed)")
                     .index(1)
                     .requires("to")
                     .required(true),
             )
             .arg(
                 Arg::new("to")
-                    .about("Target tag name (i.e. the new name)")
+                    .help("Target tag name (i.e. the new name)")
                     .index(2)
                     .requires("from")
                     .required(true),
@@ -152,14 +158,14 @@ fn add_subcommands(app: clap::App) -> clap::App {
                 Arg::new("target")
                     .short('r')
                     .long("target")
-                    .about("pre-configured target for this link")
+                    .help("pre-configured target for this link")
                     .takes_value(true),
             )
             .arg(
                 Arg::new("tag")
                     .short('t')
                     .long("tag")
-                    .about("specify a tag to be applied-- may be given more than once")
+                    .help("specify a tag to be applied-- may be given more than once")
                     .takes_value(true)
                     .multiple(true)
                     .number_of_values(1), // "-t a -t b...", not "-t a b..."
@@ -168,39 +174,39 @@ fn add_subcommands(app: clap::App) -> clap::App {
                 Arg::new("read-later")
                     .short('R')
                     .long("read-later")
-                    .about("mark this pin as `read later'"),
+                    .help("mark this pin as `read later'"),
             )
             .arg(
                 Arg::new("title")
                     .short('T')
                     .long("title")
-                    .about("link title")
+                    .help("link title")
                     .takes_value(true),
             )
             .arg(
                 Arg::new("url")
                     .index(1)
-                    .about("URL to be sent to pinboard.in")
+                    .help("URL to be sent to pinboard.in")
                     .required(true),
             )
             .arg(
                 Arg::new("instapaper")
                     .long("with-instapaper")
                     .short('i')
-                    .about("Send this link to Instapaper as well"),
+                    .help("Send this link to Instapaper as well"),
             )
             .arg(
                 Arg::new("username")
                     .long("username")
                     .short('u')
-                    .about("Your Instapaper username")
+                    .help("Your Instapaper username")
                     .takes_value(true),
             )
             .arg(
                 Arg::new("password")
                     .long("password")
                     .short('p')
-                    .about("Your Instapaper password")
+                    .help("Your Instapaper password")
                     .takes_value(true),
             ),
     )
@@ -218,11 +224,13 @@ fn main() -> Result<(), Error> {
         .version(VERSION)
         .author(AUTHOR)
         .about("Send links to Pinboard")
-        .long_about("`pin' is a small utility for managing your Pinboard links.")
+        .long_about("
+`pin' is a small utility for managing your Pinboard links.
+")
         .arg(
             Arg::new("config")
                 .short('c')
-                .about("specify a configuration file (defaults to ~/.pin")
+                .help("specify a configuration file")
                 .takes_value(true)
                 .value_name("FILE")
                 .default_value(&def_cfg),
@@ -230,27 +238,20 @@ fn main() -> Result<(), Error> {
         .arg(
             Arg::new("token")
                 .short('t')
-                .about("Your pinboard.in API token")
-                .long_about(
-                    "You can, at the time this help message was written, find your API key
-at https://pinboard.in/settings/password.",
-                )
+                .help("Your pinboard.in API token")
+                .long_help("Your pinboard.in API token; you can find your API key at https://pinboard.in/settings/password.")
                 .takes_value(true),
         )
-        .arg(
-            Arg::new("verbose")
-                .short('v')
-                .about("Enable verbose output"),
-        )
+        .arg(Arg::new("verbose").short('v').help("Enable verbose output"))
         .arg(
             Arg::new("debug")
                 .short('d')
-                .about("Enable very verbose output"),
+                .help("Enable very verbose output"),
         )
         .arg(
             Arg::new("quiet")
                 .short('q')
-                .about("Suppress all output other than errors"),
+                .help("Suppress all output other than errors"),
         );
 
     app = add_subcommands(app);

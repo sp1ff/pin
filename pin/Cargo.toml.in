@@ -15,7 +15,7 @@ exclude = ["*~", "Cargo.toml.in", "Cargo.toml.orig", "rusty-tags.emacs", "Makefi
 
 [dependencies]
 boolinator = "2.4.0"
-clap = "=3.0.0-beta.2"
+clap = "3.2"
 json = "0.12.4"
 log = "0.4.8"
 log4rs = "0.10.0"

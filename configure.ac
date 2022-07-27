@@ -1,4 +1,4 @@
-AC_INIT([pin], [0.1.3], [sp1ff@pobox.com], [], [https://github.com/sp1ff/pin])
+AC_INIT([pin], [0.2.0], [sp1ff@pobox.com], [pin], [https://github.com/sp1ff/pin])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_SRCDIR([pin/Cargo.toml.in])
 AC_CANONICAL_TARGET
