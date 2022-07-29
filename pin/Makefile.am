@@ -20,7 +20,8 @@ pin$(EXEEXT): $(pin_SOURCES)
 
 clean-local:
 	cd $(top_srcdir)/pin && \
-	CARGO_TARGET_DIR=@abs_top_builddir@/pin/target cargo clean
+	CARGO_TARGET_DIR=@abs_top_builddir@/pin/target cargo clean && \
+	rm -rf $(top_srcdir)/pin/pin-doc
 
 check-local:
 	cd $(top_srcdir)/pin && \
@@ -29,3 +30,7 @@ check-local:
 install-exec-local: pin$(EXEEXT)
 	install -d $(DESTDIR)$(bindir)
 	install -m 755 @abs_top_builddir@/pin/target/$(RUST_TARGET_SUBDIR)/pin $(DESTDIR)$(bindir)/pin
+
+doc:
+	cargo doc && \
+	cargo doc --bins --target-dir bin-doc

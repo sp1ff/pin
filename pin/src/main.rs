@@ -13,20 +13,18 @@
 // You should have received a copy of the GNU General Public License along with pin.  If not, see
 // <http://www.gnu.org/licenses/>.
 
+// TODO(sp1ff): IN-PROGRESS
 // It seems I can't document main.rs without conflicting with lib.rs? Oh, well: the tool should
 // be self-documenting, anyway.
+// https://github.com/rust-lang/cargo/issues/4341
+//! A Pinboard & Instapaper client
 
 use pin::error_from;
 use pin::Config;
 use pin::{get_tags, rename_tag, send_link};
 
 use clap::{App, Arg};
-use log::{trace, LevelFilter};
-use log4rs::{
-    append::console::{ConsoleAppender, Target},
-    config::{Appender, Root},
-    encode::pattern::PatternEncoder,
-};
+use log::trace;
 use snafu::{Backtrace, GenerateBacktrace, OptionExt, ResultExt, Snafu};
 
 use std::path::Path;
@@ -219,6 +217,13 @@ fn add_subcommands(app: clap::App) -> clap::App {
 fn main() -> Result<(), Error> {
     use pin::vars::{AUTHOR, VERSION};
 
+    use tracing::subscriber::set_global_default;
+    use tracing_subscriber::{
+        filter::LevelFilter,
+        Layer,
+        {layer::SubscriberExt, Registry},
+    };
+
     let def_cfg = format!("{}/.pin", std::env::var("HOME")?);
     let mut app = App::new("pin")
         .version(VERSION)
@@ -264,24 +269,19 @@ fn main() -> Result<(), Error> {
         matches.is_present("verbose"),
         matches.is_present("debug"),
     ) {
-        (false, _, true) => LevelFilter::Trace,
-        (false, true, false) => LevelFilter::Debug,
+        (false, _, true) => LevelFilter::TRACE,
+        (false, true, false) => LevelFilter::DEBUG,
         (true, true, false) | (true, false, true) | (true, true, true) => {
             return Err(Error::BadVerbosity)
         }
-        (true, false, false) => LevelFilter::Error,
-        _ => LevelFilter::Info,
+        (true, false, false) => LevelFilter::ERROR,
+        _ => LevelFilter::INFO,
     };
 
-    let app = ConsoleAppender::builder()
-        .target(Target::Stdout)
-        .encoder(Box::new(PatternEncoder::new("{m}{n}")))
-        .build();
-    let lcfg = log4rs::config::Config::builder()
-        .appender(Appender::builder().build("stdout", Box::new(app)))
-        .build(Root::builder().appender("stdout").build(fl))
-        .unwrap();
-    log4rs::init_config(lcfg)?;
+    set_global_default(
+        Registry::default().with(tracing_subscriber::fmt::layer().pretty().with_filter(fl)),
+    )
+    .unwrap();
 
     trace!("logging configured.");
     // reading the confguration file, if present. The `config' option was given
