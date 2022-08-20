@@ -1,3 +1,23 @@
+2022-08-20  Michael Herstine  <sp1ff@pobox.com>
+
+	Initial 0.2 re-write.
+	This is a major commit that essentially re-writes `pin`. The program
+	is now:
+
+	    - async
+	    - supports bulk operations (send, initially)
+	    - support backoff & retry on bulk send
+	    - incorporates Mockito for unit tests (rather than the trait-
+	      based approach)
+
+2022-07-29  Michael Herstine  <sp1ff@pobox.com>
+
+	Switched from log4rs to tracing.
+
+2022-07-26  Michael Herstine  <sp1ff@pobox.com>
+
+	Upgraded `pin` to Clap 3.2.
+
 2021-08-02  Michael Herstine  <sp1ff@pobox.com>
 
 	Update Cargo.toml for packaging.

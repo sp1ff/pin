@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2021 Michael Herstine <sp1ff@pobox.com>
+// Copyright (C) 2020-2022 Michael Herstine <sp1ff@pobox.com>
 //
 // This file is part of pin.
 //
@@ -13,95 +13,97 @@
 // You should have received a copy of the GNU General Public License along with pin.  If not, see
 // <http://www.gnu.org/licenses/>.
 
-//! pin -- A command-line client for Pinboard & Instapaper
+//! pin -- a crate for managing your Pinboard links
+//!
+//! # Introduction
+//!
+//! [`pin`] is a crate for working with [Pinboard] and, optionally, [Instapaper]. For instance,
+//! to send a link to Pinboard:
+//!
+//! [Pinboard]: https://pinboard.in
+//! [Instapaper]: https://www.instapaper.com
+//!
+//! ``` ignore
+//! use pin::pinboard::{Client, Post, Tag, Title};
+//! use reqwest::Url;
+//! use std::str::FromStr;
+//! let client = Client::new("https://api.pinboard.in", "jdoe:DECADE90C0DEDDABB1ED").unwrap();
+//! let post = Post::new(Url::parse("http://foo.com").unwrap(),
+//!                      Title::new("The Frobinator").unwrap(),
+//!                      vec!["tag1", "tag2", "tag3"].iter().map(|s| Tag::from_str(s).unwrap()),
+//!                      true);
+//! client.send_post(&post).await.expect_err("Surely no one has that username & token?");
+//! ```
+//!
+//! It is a small crate I wrote primarily to support my own workflow, and currently is used in the
+//! implementation of the [`pin`] CLI tool.
+//!
+//! [`pin`]: https://www.unwoundstack.com/doc/pin/curr
+//!
+//! # Retries & Backoff
+//!
+//! Both the [Pinboard] & [Instapaper] APIs reserve the right to rate-limit callers. In the case of
+//! Pinboard, the advertised acceptable rate for most endpoints is one request every three seconds
+//! (much worse for a few selected endpoints), but I've seen far better than that in the wild. The
+//! [docs] suggest: "Make sure your API clients check for 429 Too Many Requests server errors and
+//! back off appropriately. If possible, keep doubling the interval between requests until you stop
+//! receiving errors."
+//!
+//! [docs]: https://pinboard.in/api/
+//!
+//! Instapaper is a bit more coy, only [alluding] to rate-limiting in their documentation for a 400
+//! response code as being returned for "a bad request or exceeded the rate limit". The rate limit
+//! is never defined, and I have never encountered it in the wild.
+//!
+//! [alluding]: https://www.instapaper.com/api/simple
+//!
+//! Regardless, you can use [`make_requests_with_backoff`] to make one or more requests with retries
+//! and (linear) backoff.
 
-pub mod error_from;
+pub mod config;
 pub mod instapaper;
 pub mod pinboard;
 pub mod vars;
 
-use instapaper::Instapaper;
-use pinboard::Pinboard;
-
-use serde::Deserialize;
-use snafu::{Backtrace, GenerateBacktrace, Snafu};
+use async_trait::async_trait;
+use snafu::{IntoError, ResultExt, Snafu};
 use strfmt::strfmt;
+use tracing::{debug, trace};
 
-use std::cmp::max;
-use std::collections::HashMap;
+use std::{cmp::max, collections::HashMap, fmt::Debug, sync::atomic::Ordering};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
+type StdResult<T, E> = std::result::Result<T, E>;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("{}", cause))]
-    Other {
-        #[snafu(source(true))]
-        cause: Box<dyn std::error::Error>,
-        #[snafu(backtrace(true))]
-        back: Backtrace,
-    },
+    #[snafu(display("{}", source))]
+    Io { source: std::io::Error },
+    #[snafu(display("The maximum number of retries was exceeded"))]
+    MaxRetriesExceeded,
+    #[snafu(display("Pinboard API error {}", source))]
+    Pinboard { source: pinboard::Error },
+    #[snafu(display("While sending, got {}", source))]
+    Send { source: SendError },
 }
-
-error_from!(instapaper::Error);
-error_from!(pinboard::Error);
-error_from!(std::io::Error);
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                      `pin' Configuration                                       //
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// A Target is a pre-defined set of Pinboard tags together with the "read only" flag; i.e. a
-/// pre-configured "place" at Pinboard to which a link may be sent
-#[derive(Debug, Deserialize)]
-pub struct Target {
-    pub read_later: bool,
-    pub send_to_insty: bool,
-    pub tags: Vec<String>,
-}
-
-/// Application configuration; by default read from ~/.pin (but that location can be overriden
-/// on the command-line), but also assembled from command-line option & the environment.
-#[derive(Debug, Deserialize)]
-pub struct Config {
-    /// Pinboard API token
-    #[serde(default)]
-    pub token: String,
-    /// Predefined Pinboard tagsets to apply to links
-    #[serde(default)]
-    pub targets: HashMap<String, Target>,
-    /// Instapaper username
-    #[serde(default)]
-    pub username: String,
-    /// Instapaper password
-    #[serde(default)]
-    pub password: String,
-}
-
-impl Config {
-    pub fn new() -> Config {
-        Config {
-            token: String::from(""),
-            targets: HashMap::new(),
-            username: String::from(""),
-            password: String::from(""),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Get all Pinboard.in tags & pretty-print 'em
-pub fn get_tags<W: std::io::Write, C: pinboard::Pinboard>(
+#[tracing::instrument]
+pub async fn get_tags<W: std::io::Write + std::fmt::Debug>(
     out: &mut W,
-    client: &mut C,
+    client: &pinboard::Client,
     alpha: bool,
     desc: bool,
     csv: bool,
 ) -> Result<()> {
-    let mut tags = client.get_all_tags()?;
+    let mut tags = client
+        .get_all_tags()
+        .await
+        .context(PinboardSnafu)?
+        .drain()
+        .map(|(k, v)| (k, v))
+        .collect::<Vec<(String, usize)>>();
     let max_lens = match csv {
         true => None,
         false => {
@@ -148,24 +150,24 @@ pub fn get_tags<W: std::io::Write, C: pinboard::Pinboard>(
             let mut hdrvars: HashMap<String, &str> = HashMap::new();
             hdrvars.insert(String::from("tag"), "Tag");
             hdrvars.insert(String::from("uc"), "Use Count");
-            writeln!(out, "{}", strfmt(&fmt, &hdrvars).unwrap())?;
+            writeln!(out, "{}", strfmt(&fmt, &hdrvars).unwrap()).context(IoSnafu)?;
 
-            writeln!(out, "{}", rule)?;
+            writeln!(out, "{}", rule).context(IoSnafu)?;
 
             for tag in &tags {
                 let s = format!("{}", tag.1);
                 let mut vars: HashMap<String, &str> = HashMap::new();
                 vars.insert(String::from("tag"), &tag.0);
                 vars.insert(String::from("uc"), &s);
-                writeln!(out, "{}", strfmt(&fmt, &vars).unwrap())?;
+                writeln!(out, "{}", strfmt(&fmt, &vars).unwrap()).context(IoSnafu)?;
             }
 
-            writeln!(out, "{}", rule)?;
+            writeln!(out, "{}", rule).context(IoSnafu)?;
         }
         None => {
             // We're printing in CSV
             for tag in &tags {
-                writeln!(out, "{},{}", tag.0, tag.1)?;
+                writeln!(out, "{},{}", tag.0, tag.1).context(IoSnafu)?;
             }
         }
     }
@@ -173,137 +175,426 @@ pub fn get_tags<W: std::io::Write, C: pinboard::Pinboard>(
     Ok(())
 }
 
+/// Make a series of requests to an API, with retries & linear backoff.
+///
+/// Both the [Pinboard] & [Instapaper] APIs reserve the right to rate-limit callers. In the case of
+/// Pinboard, the advertised acceptable rate for most endpoints is one request every three seconds
+/// (much worse for a few selected endpoints), but I've seen far better than that in the wild. The
+/// [docs] suggest: "Make sure your API clients check for 429 Too Many Requests server errors and
+/// back off appropriately. If possible, keep doubling the interval between requests until you stop
+/// receiving errors."
+///
+/// [docs]: https://pinboard.in/api/
+///
+/// Instapaper is a bit more coy, only [alluding] to rate-limiting in their documentation for a 400
+/// response code as being returned for "a bad request or exceeded the rate limit". The rate limit
+/// is never defined, and I have never encountered it in the wild.
+///
+/// [alluding]: https://www.instapaper.com/api/simple
+///
+/// Regardless, this implementation will take into account the possibility of rate-limiting by
+/// retrying on certain status codes, halving the request rate each time. At the same time it tires
+/// to take advantage of the fact that they don't seem widely enforced by increasing the request
+/// rate on success. Expressed in pseudo-code:
+///
+/// ```text
+/// LET BETA := the wait time between API requests (say, 3 sec)
+/// LET REQS := an Iterator over >=0 requests
+/// WHILE REQS
+///   let LAST_SENT := NOW()
+///   send REQS.curr()
+///   match response
+///     success :=> {
+///       BETA := BETA / 2;
+///       REQS = REQS.next()
+///     }
+///     429 Too Many Requests :=> BETA *= 2;
+///     else :=> fail
+///   end
+///   if REQS {
+///     wait BETA_PIN - (NOW() - LAST_SENT_PIN)
+///   }
+/// return BETA
+/// ```
+///
+/// In order to abstract over the particular request being made (and even API being hit), this
+/// implementation works in tems of the [`Sender`] trait.
+#[tracing::instrument]
+pub async fn make_requests_with_backoff<I, T>(
+    mut reqs: I,
+    mut beta_ms: u64,
+    max_beta_ms: u64,
+    max_retries: usize,
+) -> Result<u64>
+where
+    I: Iterator<Item = T> + Debug,
+    T: Sender + Debug,
+{
+    use std::time::SystemTime;
+
+    let mut retries = 0;
+    let mut req = reqs.next();
+    while let Some(post) = &req {
+        let last_sent = SystemTime::now();
+        match post.send().await {
+            Ok(_) => {
+                beta_ms = beta_ms / 2;
+                trace!("beta :=> {}", beta_ms);
+                req = reqs.next();
+            }
+            Err(SendError::TooManyRequests) => {
+                beta_ms = beta_ms.checked_mul(2).unwrap_or(max_beta_ms);
+                trace!("beta :=> {}", beta_ms);
+                retries = retries + 1;
+                if retries > max_retries {
+                    return Err(Error::MaxRetriesExceeded);
+                }
+            }
+            Err(err) => {
+                return Err(SendSnafu.into_error(err));
+            }
+        }
+        if req.is_some() {
+            let elapsed: u128 = SystemTime::now()
+                .duration_since(last_sent)
+                .unwrap()
+                .as_millis();
+            let elapsed: u64 = u64::try_from(elapsed).unwrap();
+            trace!("elapsed is {}", elapsed);
+            let backoff = beta_ms.checked_sub(elapsed).unwrap();
+            debug!("Sleeping for {}ms...", backoff);
+            tokio::time::sleep(std::time::Duration::from_millis(backoff)).await;
+            debug!("Sleeping for {}ms...done.", backoff);
+        }
+    }
+
+    Ok(beta_ms)
+}
+
+/// [`Sender`] implementations can fail in one of two ways: we were rate-limited or "something else
+/// went wrong"
+#[derive(Debug, Snafu)]
+pub enum SendError {
+    #[snafu(display("Rate-limited"))]
+    TooManyRequests,
+    #[snafu(display("Request failure: {source}"))]
+    Failure { source: Box<dyn std::error::Error> },
+}
+
+/// An entity that can send a single request with two failure modes: rate-limited, and everything
+/// else
+#[async_trait]
+pub trait Sender {
+    async fn send(&self) -> StdResult<(), SendError>;
+}
+
+/// Post a link to the [Instapaper] API
+///
+/// [Instapaper]: https://www.instapaper.com
+#[derive(Debug)]
+pub struct InstapaperPost<'a> {
+    client: &'a instapaper::Client,
+    post: instapaper::Post,
+}
+
+#[async_trait]
+impl<'a> Sender for &InstapaperPost<'a> {
+    async fn send(&self) -> StdResult<(), SendError> {
+        match self.client.send_link(&self.post).await {
+            Ok(_) => Ok(()),
+            Err(instapaper::Error::RateLimit) => Err(SendError::TooManyRequests),
+            Err(err) => Err(FailureSnafu.into_error(Box::new(err))),
+        }
+    }
+}
+
+impl<'a> InstapaperPost<'a> {
+    pub fn new(client: &'a instapaper::Client, post: instapaper::Post) -> InstapaperPost<'a> {
+        InstapaperPost {
+            client: client,
+            post: post,
+        }
+    }
+}
+
+/// Post to the [Pinboard] API, and optionally the [Instapaper] API
+///
+/// [Pinboard]: https://pinboard.in
+/// [Instapaper]: https://www.instapaper.com
+#[derive(Debug)]
+pub struct PinboardPost<'a, 'b> {
+    client: &'a pinboard::Client,
+    post: pinboard::Post,
+    insty: Option<(
+        InstapaperPost<'b>,
+        std::sync::Arc<std::sync::atomic::AtomicU64>,
+        u64,
+        usize,
+    )>,
+}
+
+#[async_trait]
+impl<'a, 'b> Sender for PinboardPost<'a, 'b> {
+    /// Send a link to [Pinboard]. If so configured, call [`make_requests_with_backoff`] with the
+    /// optional [Instapaper] link.
+    ///
+    /// [Pinboard]: https://pinboard.in
+    /// [Instapaper]: https://www.instapaper.com
+    async fn send(&self) -> StdResult<(), SendError> {
+        match self.client.send_post(&self.post).await {
+            Ok(_) => {
+                if let Some((insty_post, beta, max_beta, max_retries)) = &self.insty {
+                    let new_beta = make_requests_with_backoff(
+                        std::iter::once(insty_post),
+                        beta.load(Ordering::Relaxed),
+                        *max_beta,
+                        *max_retries,
+                    )
+                    .await
+                    .map_err(|err| FailureSnafu.into_error(Box::new(err)))?;
+                    beta.store(new_beta, Ordering::Relaxed);
+                }
+                Ok(())
+            }
+            Err(pinboard::Error::RateLimit) => Err(SendError::TooManyRequests),
+            Err(err) => Err(FailureSnafu.into_error(Box::new(err))),
+        }
+    }
+}
+
+impl<'a, 'b> PinboardPost<'a, 'b> {
+    pub fn new(
+        pin_client: &'a pinboard::Client,
+        pin_post: pinboard::Post,
+        instapaper: Option<(
+            &'b instapaper::Client,
+            instapaper::Post,
+            std::sync::Arc<std::sync::atomic::AtomicU64>,
+            u64,
+            usize,
+        )>,
+    ) -> PinboardPost<'a, 'b> {
+        PinboardPost {
+            client: pin_client,
+            post: pin_post,
+            insty: instapaper.and_then(|(client, post, atom, max_beta, max_retries)| {
+                Some((
+                    InstapaperPost::new(client, post),
+                    atom,
+                    max_beta,
+                    max_retries,
+                ))
+            }),
+        }
+    }
+}
 #[cfg(test)]
-mod tests {
+mod test {
 
     use super::*;
 
-    struct MockPins {
-        tags: std::vec::Vec<(String, usize)>,
+    use reqwest::{StatusCode, Url};
+    use test_log::test;
+    use tracing::error;
+
+    use std::{
+        collections::VecDeque,
+        str::FromStr,
+        sync::{Arc, Mutex},
+        time::{Duration, SystemTime},
+    };
+
+    /// A Mockito-style server that mocks the Pinboard & Instapaper APIs
+    ///
+    /// Mockito's pretty cool for mocking an individual request/response pair, but provides no
+    /// support for multi-request conversations. I cooked this up to test my backoff & retry logic.
+    struct MockTestServer {
+        addr: Url,
+        expected: VecDeque<(String, StatusCode)>,
+        deltas: Vec<Duration>,
+        last_received: Option<SystemTime>,
     }
 
-    impl MockPins {
-        pub fn new(tags: std::vec::Vec<(String, usize)>) -> MockPins {
-            MockPins { tags: tags }
-        }
-    }
+    impl MockTestServer {
+        /// Start an async server that expects a certain sequence of requests & will respond with
+        /// pre-loaded responses so long as it continues to receive expected input.
+        pub async fn new<'a, I>(iter: I) -> Arc<Mutex<MockTestServer>>
+        where
+            I: IntoIterator<Item = &'a (&'static str, StatusCode)>,
+        {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
 
-    impl crate::pinboard::Pinboard for MockPins {
-        fn get_all_tags(&self) -> crate::pinboard::Result<std::vec::Vec<(String, usize)>> {
-            Ok(self.tags.clone())
-        }
-        fn rename_tag(&mut self, old: &str, new: &str) -> crate::pinboard::Result<String> {
-            let oldidx = match self.tags.iter().position(|x| x.0 == old) {
-                None => return Ok("done".to_owned()),
-                Some(oldidx) => oldidx,
-            };
-            match self.tags.iter().position(|x| x.0 == new) {
-                Some(newidx) => {
-                    self.tags[newidx].1 += self.tags[oldidx].1;
-                    self.tags.remove(oldidx);
+            let mock = Arc::new(Mutex::new(MockTestServer {
+                addr: Url::parse(&format!("http://{}", listener.local_addr().unwrap())).unwrap(),
+                expected: iter
+                    .into_iter()
+                    .map(|pair| (pair.0.into(), pair.1))
+                    .collect::<VecDeque<(String, StatusCode)>>(),
+                deltas: Vec::new(),
+                last_received: None,
+            }));
+
+            let server_mock = mock.clone();
+            tokio::spawn(async move {
+                loop {
+                    let (mut stream, _) = listener.accept().await.unwrap();
+                    let inner_mock = server_mock.clone();
+                    tokio::spawn(async move {
+                        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                        let mut incoming = vec![];
+                        loop {
+                            let mut buf = vec![0u8; 1024];
+                            let read = stream.read(&mut buf).await.unwrap();
+                            incoming.extend_from_slice(&buf[..read]);
+                            if incoming.len() > 4 && &incoming[incoming.len() - 4..] == b"\r\n\r\n"
+                            {
+                                break;
+                            }
+                        }
+
+                        let now = SystemTime::now();
+                        let incoming = std::str::from_utf8(&incoming).unwrap();
+
+                        // Pop the next expected request off the inner_mock:
+                        let expected;
+                        {
+                            let inner_mock = inner_mock.lock();
+                            expected = inner_mock.unwrap().pop_front();
+                        }
+
+                        if incoming.starts_with(&expected.0) {
+                            stream
+                                .write_all(
+                                    format!(
+                                        "HTTP/1.1 {}\r\n\r\n{}\r\n",
+                                        expected.1,
+                                        if expected.0 == "/v1/posts/add" {
+                                            "{\"result_code\":\"done\"}"
+                                        } else {
+                                            "{\"bookmark_id\": 1530898236}"
+                                        }
+                                    )
+                                    .as_bytes(),
+                                )
+                                .await
+                                .unwrap();
+                        } else {
+                            stream
+                                .write_all(b"HTTP/1.1 428 Precondition Required\r\n")
+                                .await
+                                .unwrap();
+                        }
+
+                        {
+                            let mut inner_mock = inner_mock.lock().unwrap();
+                            inner_mock.note_receipt_of_request(now);
+                        }
+                    });
                 }
-                None => self.tags[oldidx].0 = String::from(new),
+            });
+            mock
+        }
+        pub fn deltas(&self) -> Vec<Duration> {
+            self.deltas.clone()
+        }
+        pub fn note_receipt_of_request(&mut self, recvd: SystemTime) {
+            if let Some(last_received) = self.last_received {
+                self.deltas
+                    .push(recvd.duration_since(last_received).unwrap())
             }
-
-            return Ok("done".to_owned());
+            self.last_received = Some(recvd);
         }
-        fn send<I: Iterator<Item = String>>(
-            &mut self,
-            _url: &str,
-            _title: &str,
-            _tags: I,
-            _rl: bool,
-        ) -> crate::pinboard::Result<String> {
-            return Ok("done".to_owned());
+        pub fn pop_front(&mut self) -> (String, StatusCode) {
+            self.expected.pop_front().unwrap()
+        }
+        pub fn server_url(&self) -> Url {
+            self.addr.clone()
         }
     }
 
-    #[test]
-    fn get_tags_smoke_test_num_asc_pp() {
-        let mut buf: Vec<u8> = vec![]; // implements Write
-        let mut pins = MockPins::new(vec![(String::from("foo"), 1), (String::from("bar"), 2)]);
-        let result = get_tags(&mut buf, &mut pins, false, false, false);
+    #[test(tokio::test)]
+    async fn backoff_test() {
+        let mock = MockTestServer::new(&[
+            ("GET /v1/posts/add", StatusCode::TOO_MANY_REQUESTS), // N/A
+            ("GET /v1/posts/add", StatusCode::OK),                // 6000
+            ("GET /api/add", StatusCode::OK),                     // 0
+            ("GET /v1/posts/add", StatusCode::OK),                // 3000
+            ("GET /api/add", StatusCode::BAD_REQUEST),            // 0
+            ("GET /api/add", StatusCode::BAD_REQUEST),            // 1000
+            ("GET /api/add", StatusCode::OK),                     // 2000
+        ])
+        .await;
 
-        assert!(result.is_ok());
+        let insty_client;
+        let pin_client;
 
-        let golden = r#"| Tag | Use Count |
-+-----+-----------+
-| foo |         1 |
-| bar |         2 |
-+-----+-----------+
-"#;
-        assert!(golden == std::str::from_utf8(&buf).unwrap());
+        {
+            let guard = mock.lock().unwrap();
+            pin_client =
+                pinboard::Client::new(guard.server_url(), "sp1ff:FFFFFFFFFFFFFFFFFFFF").unwrap();
+            insty_client = instapaper::Client::new(guard.server_url(), "sp1ff@pobox.com", "c0fee")
+                .expect("Failed to build client");
+        }
+
+        let atom = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(1000));
+
+        make_requests_with_backoff(
+            vec![
+                PinboardPost::new(
+                    &pin_client,
+                    pinboard::Post::new(
+                        Url::parse("https://foo.com").unwrap(),
+                        pinboard::Title::from_str("Frobinator").unwrap(),
+                        vec![].into_iter(),
+                        true,
+                    ),
+                    Some((
+                        &insty_client,
+                        instapaper::Post::new("https://foo.com", Some("Frobinator"), None).unwrap(),
+                        atom.clone(),
+                        10000,
+                        5,
+                    )),
+                ),
+                PinboardPost::new(
+                    &pin_client,
+                    pinboard::Post::new(
+                        Url::parse("https://bar.com").unwrap(),
+                        pinboard::Title::from_str("Bar none!").unwrap(),
+                        vec![].into_iter(),
+                        true,
+                    ),
+                    Some((
+                        &insty_client,
+                        instapaper::Post::new("https://bar.com", Some("Bar none!"), None).unwrap(),
+                        atom.clone(),
+                        10000,
+                        5,
+                    )),
+                ),
+            ]
+            .into_iter(),
+            3000,
+            10000,
+            5,
+        )
+        .await
+        .unwrap_or_else(|err| {
+            error!("{}", err);
+            panic!();
+        });
+
+        let deltas;
+        {
+            deltas = mock.lock().unwrap().deltas();
+        }
+
+        assert_eq!(6, deltas.len());
+        assert!(deltas[0].as_millis().checked_sub(6000).unwrap() <= 10);
+        assert!(deltas[1].as_millis() <= 10);
+        assert!(deltas[2].as_millis().checked_sub(3000).unwrap() <= 10);
+        assert!(deltas[3].as_millis() <= 10);
+        assert!(deltas[4].as_millis().checked_sub(1000).unwrap() <= 10);
+        assert!(deltas[5].as_millis().checked_sub(2000).unwrap() <= 10);
     }
-
-    #[test]
-    fn get_tags_smoke_test_num_asc_csv() {
-        let mut buf: Vec<u8> = vec![]; // implements Write
-        let mut pins = MockPins::new(vec![(String::from("foo"), 1), (String::from("bar"), 2)]);
-        let result = get_tags(&mut buf, &mut pins, false, false, true);
-
-        assert!(result.is_ok());
-
-        let golden = r#"foo,1
-bar,2
-"#;
-        assert!(golden == std::str::from_utf8(&buf).unwrap());
-    }
-
-    #[test]
-    fn get_tags_smoke_test_num_desc_pp() {
-        let mut buf: Vec<u8> = vec![]; // implements Write
-        let mut pins = MockPins::new(vec![(String::from("foo"), 1), (String::from("bar"), 2)]);
-        let result = get_tags(&mut buf, &mut pins, false, true, false);
-
-        assert!(result.is_ok());
-
-        let golden = r#"| Tag | Use Count |
-+-----+-----------+
-| bar |         2 |
-| foo |         1 |
-+-----+-----------+
-"#;
-        assert!(golden == std::str::from_utf8(&buf).unwrap());
-    }
-
-    #[test]
-    fn get_tags_smoke_test_num_desc_csv() {
-        let mut buf: Vec<u8> = vec![]; // implements Write
-        let mut pins = MockPins::new(vec![(String::from("foo"), 1), (String::from("bar"), 2)]);
-        let result = get_tags(&mut buf, &mut pins, false, true, true);
-
-        assert!(result.is_ok());
-
-        let golden = r#"bar,2
-foo,1
-"#;
-        assert!(golden == std::str::from_utf8(&buf).unwrap());
-    }
-} // End module `test'.
-
-/// Rename a tag
-pub fn rename_tag<W: std::io::Write>(
-    out: &mut W,
-    client: &mut pinboard::Client,
-    from: &str,
-    to: &str,
-) -> Result<()> {
-    Ok(writeln!(out, "{}", client.rename_tag(from, to)?)?)
-}
-
-/// Send a link
-pub fn send_link<W: std::io::Write, I: Iterator<Item = String>>(
-    _out: &mut W,
-    pin_client: &mut pinboard::Client,
-    insta_client: Option<&mut instapaper::Client>,
-    url: &str,
-    title: &str,
-    read_later: bool,
-    tags: I,
-) -> Result<()> {
-    pin_client.send(url, title, tags, read_later)?;
-    if let Some(cli) = insta_client {
-        cli.send(url, Some(title))?;
-    }
-    Ok(())
 }

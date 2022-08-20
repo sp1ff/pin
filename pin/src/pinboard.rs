@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2021 Michael Herstine <sp1ff@pobox.com>
+// Copyright (C) 2020-2022 Michael Herstine <sp1ff@pobox.com>
 //
 // This file is part of pin.
 //
@@ -13,269 +13,436 @@
 // You should have received a copy of the GNU General Public License along with pin.  If not, see
 // <http://www.gnu.org/licenses/>.
 
-//! pinboard -- pinboard API client
+//! Managing Pinboard links
 //!
-//! This module provides a rudimentary client for the [Pinboard](https://pinboard.in/)
-//! [API](https://pinboard.in/api/).
+//! # Introduction
+//!
+//! This module provides a client for [Pinboard]:
+//!
+//! [Pinboard]: https://pinboard.in
+//!
+//! ```
+//! # tokio_test::block_on(async {
+//! use pin::pinboard::{Client, Post, Tag, Title};
+//! use reqwest::Url;
+//! use std::str::FromStr;
+//! let client = Client::new("https://api.pinboard.in", "jdoe:DECADE90C0DEDDABB1ED").unwrap();
+//! let post = Post::new(Url::parse("http://foo.com").unwrap(),
+//!                      Title::new("The Frobinator").unwrap(),
+//!                      vec!["tag1", "tag2", "tag3"].iter().map(|s| Tag::from_str(s).unwrap()),
+//!                      true);
+//! client.send_post(&post).await.expect_err("Surely no one has that username & token?");
+//! # })
+//! ```
+//!
+//! # Notes
+//! This implementation uses [version 1] of the Pinboard API.
+//!
+//! [version 1]: https://pinboard.in/api
+//!
+//! The Pinboard API advertises rate limits (although I haven't seen them enforced in the
+//! wild). This client implementation only deals in individual requests; for retry & backoff logic,
+//! see [`send_links_with_backoff`].
 
-use crate::error_from;
-use crate::vars::PIN_UA;
+use reqwest::{IntoUrl, StatusCode, Url};
+use serde::{Deserialize, Serialize};
+use snafu::{prelude::*, Backtrace};
+use unicode_segmentation::UnicodeSegmentation;
 
-use boolinator::Boolinator;
-use json::JsonValue;
-use log::debug;
-use reqwest::header::USER_AGENT;
-use serde_urlencoded::to_string as encode;
-use snafu::{Backtrace, GenerateBacktrace, OptionExt, Snafu};
+use std::collections::HashMap;
+use std::fmt::{Debug, Display};
 
-use std::vec::Vec;
+type StdResult<T, E> = std::result::Result<T, E>;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                       module Error type                                        //
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/// Pinboard-related errors
+#[non_exhaustive]
 #[derive(Debug, Snafu)]
 pub enum Error {
-    /// Allow conversion from another Error to this module's error type by wrapping the original
-    /// (with a backtrace)
-    #[snafu(display("{}", cause))]
-    Other {
-        #[snafu(source(true))]
-        cause: Box<dyn std::error::Error>,
-        #[snafu(backtrace(true))]
-        back: Backtrace,
+    #[snafu(display("Invalid URL for the Pinboard API: {source}"))]
+    BadUrl {
+        source: reqwest::Error,
+        backtrace: Backtrace,
     },
-    /// Failed HTTP call (i.e. non-2XX status code returned from the API)
-    #[snafu(display("While calling `{}' got {}", ep, status))]
+    #[snafu(display("HTTP error: {source}"))]
     Http {
-        ep: String,
+        source: reqwest::Error,
+        backtrace: Backtrace,
+    },
+    #[snafu(display("\"{text}\" is not a valid tag"))]
+    InvalidTag { text: String, backtrace: Backtrace },
+    #[snafu(display("\"{text}\" is not a valid title"))]
+    InvalidTitle { text: String, backtrace: Backtrace },
+    #[snafu(display("Pinboard API error: {status}"))]
+    Pinboard {
         status: reqwest::StatusCode,
-        #[snafu(backtrace(true))]
-        back: Backtrace,
+        backtrace: Backtrace,
     },
-    #[snafu(display("Got unexpected JSON type {:#?} for field `{}'", item, name))]
-    BadJsonFieldType { name: String, item: JsonValue },
-    #[snafu(display("Unexpected JSON type {:#?}", item))]
-    BadJsonType {
-        item: JsonValue,
-        #[snafu(backtrace(true))]
-        back: Backtrace,
-    },
+    #[snafu(display("Rate limit hit"))]
+    RateLimit,
 }
 
-error_from!(json::Error);
-error_from!(std::num::ParseIntError);
-error_from!(reqwest::Error);
-error_from!(serde_urlencoded::ser::Error);
-error_from!(std::str::Utf8Error);
-
-pub type Result<T> = std::result::Result<T, Error>;
+type Result<T> = StdResult<T, Error>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                    Pinboard API data types                                     //
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Break down the JSON respones body (to /v1/tags/get) into a Vec of (String, usize) tuples
-/// (representing tag name & use count, respectively).
-pub fn counts_for_json(text: &str) -> Result<Vec<(String, usize)>> {
-    debug!("about to parse: ``{}''", text);
-    let res = json::parse(text);
-    debug!("got {:#?}", res);
-    let val = res.unwrap();
-    match val {
-        JsonValue::Object(doc) => doc
-            .iter()
-            .map(|(name, value)| match value {
-                JsonValue::Short(s) => Ok((name.to_string(), s.as_str().parse::<usize>()?)),
-                JsonValue::Number(n) => Ok((name.to_string(), n.to_string().parse::<usize>()?)),
-                _ => Err(Error::BadJsonFieldType {
-                    name: name.to_string(),
-                    item: value.clone(),
-                }),
-            })
-            .collect(),
-        _ => Err(Error::BadJsonType {
-            item: val,
-            back: Backtrace::generate(),
-        }),
+/// An owned Pinboard-compliant tag.
+///
+/// Pinboard tags may be up to 255 ["logical characters"] in length and may not contain commas or
+/// whitespace. By "logical character" I take the API docs to mean grapheme clusters, as all
+/// entities are encoded as UTF-8. Furthermore, tags may be designated as ["private"] by starting
+/// them with a ".".
+///
+/// ["logical characters"]: https://pinboard.in/api/#encoding
+/// ["private"]: https://pinboard.in/tour/#privacy
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(try_from = "String")]
+pub struct Tag {
+    // NB. We store the display form of the tag in `value`, so we need to maintain the internal
+    // invariant that a private tag begins with a '.'
+    value: String,
+}
+
+impl Tag {
+    /// Create a new public [`Tag`]
+    ///
+    /// `text` may not begin with the '.' character, may not contain either the ',' character nor
+    /// any whitespace, and must contain less than 256 grapheme clusters.
+    pub fn new(text: &str) -> Result<Tag> {
+        Tag::validate_text(text, 256)?;
+        Ok(Tag { value: text.into() })
+    }
+    /// Create a new private Tag
+    ///
+    /// `text` may not begin with the '.' character, may not contain either the ',' character nor
+    /// any whitespace, and must contain less than 255 grapheme clusters.
+    pub fn private(text: &str) -> Result<Tag> {
+        Tag::validate_text(text, 255)?;
+        Ok(Tag {
+            value: format!(".{}", text),
+        })
+    }
+    /// Validate text as a Pinboard tag
+    fn validate_text(text: &str, max_grapheme_clusters: usize) -> Result<()> {
+        if text.contains(char::is_whitespace)
+            || text.contains(',')
+            || UnicodeSegmentation::graphemes(text, true).count() >= max_grapheme_clusters
+        {
+            return InvalidTagSnafu {
+                text: text.to_string(),
+            }
+            .fail();
+        }
+        Ok(())
+    }
+}
+
+impl std::convert::AsRef<str> for Tag {
+    fn as_ref(&self) -> &str {
+        &self.value
+    }
+}
+
+impl Display for Tag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> StdResult<(), std::fmt::Error> {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl std::convert::TryFrom<String> for Tag {
+    type Error = Error;
+    fn try_from(s: String) -> StdResult<Self, Self::Error> {
+        // Seems a bit too cute; couldn't wriggle-out of the clone() in the error case :(
+        if '.' as u8
+            == *s
+                .as_bytes()
+                .iter()
+                .take(1)
+                .next()
+                .ok_or_else(|| InvalidTagSnafu { text: s.clone() }.build())?
+        {
+            Tag::validate_text(
+                std::str::from_utf8(&s.as_bytes()[1..]).expect("Bad UTF-8"),
+                254,
+            )?;
+            Ok(Tag { value: s })
+        } else {
+            Tag::validate_text(&s, 255)?;
+            Ok(Tag { value: s })
+        }
+    }
+}
+
+impl std::str::FromStr for Tag {
+    type Err = Error;
+    fn from_str(s: &str) -> StdResult<Self, Self::Err> {
+        Tag::try_from(s.to_string())
+    }
+}
+
+/// An owned Pinboard-compliant title (or description)
+///
+/// Pinboard titles/descriptions may be up to 255 ["logical characters"] in length. By "logical
+/// character" I take the API docs to mean grapheme clusters, as all entities are encoded as UTF-8.
+///
+/// ["logical characters"]: https://pinboard.in/api/#encoding
+#[derive(Debug)]
+pub struct Title {
+    title: String,
+}
+
+impl Title {
+    pub fn new(text: &str) -> Result<Title> {
+        Title::validate_text(text)?;
+        Ok(Title { title: text.into() })
+    }
+    /// Validate text as a Pinboard title
+    fn validate_text(text: &str) -> Result<()> {
+        if UnicodeSegmentation::graphemes(text, true).count() > 255 {
+            return InvalidTitleSnafu {
+                text: text.to_string(),
+            }
+            .fail();
+        }
+        Ok(())
+    }
+}
+
+impl std::convert::AsRef<str> for Title {
+    fn as_ref(&self) -> &str {
+        &self.title
+    }
+}
+
+impl Display for Title {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> StdResult<(), std::fmt::Error> {
+        write!(f, "{}", self.title)
+    }
+}
+
+impl std::str::FromStr for Title {
+    type Err = Error;
+    fn from_str(s: &str) -> StdResult<Self, Self::Err> {
+        Title::validate_text(s)?;
+        Ok(Title { title: s.into() })
     }
 }
 
 #[cfg(test)]
-mod json_tests {
+mod entity_tests {
     use super::*;
-    /// Run a few basic tests of JSON parsing
+
     #[test]
-    fn json_smoke() {
-        let x = counts_for_json("{\"@gdrive\":\"1\",\"@review-c++\":\"56\"}");
-        if let Ok(y) = x {
-            assert_eq!(
-                y,
-                vec![("@gdrive".to_string(), 1), ("@review-c++".to_string(), 56)]
-            );
-        }
+    fn test_tag() {
+        let x = Tag::new("foo");
+        assert!(x.is_ok());
+        let x = x.unwrap();
+        assert_eq!(format!("{}", x), "foo");
+
+        let x = Tag::private("bar");
+        assert!(x.is_ok());
+        let x = x.unwrap();
+        assert_eq!(format!("{}", x), ".bar");
+
+        // "好" is a single grapheme clsuter. That means I should be able to fit 255 of them
+        // into a Tag, but not one more.
+        let x = Tag::new(&"好".repeat(255));
+        assert!(x.is_ok());
+        let x = Tag::new(&"好".repeat(256));
+        assert!(x.is_err());
+        // and one fewer if it's private
+        let x = Tag::private(&"好".repeat(254));
+        assert!(x.is_ok());
+        let x = Tag::private(&"好".repeat(255));
+        assert!(x.is_err());
+
+        // Finally, check the "comma & whitespace" condition
+        let x = Tag::new("a,b");
+        assert!(x.is_err());
+        let x = Tag::new("a b");
+        assert!(x.is_err());
     }
 }
 
-pub trait Pinboard {
-    /// Retrieve your Pinboard tags along with their use counts
-    fn get_all_tags(&self) -> Result<Vec<(String, usize)>>;
-    /// Rename tag "from" to "to"
-    fn rename_tag(&mut self, from: &str, to: &str) -> Result<String>;
-    /// Send a single link to Pinboard
-    fn send<I: Iterator<Item = String>>(
-        &mut self,
-        url: &str,
-        title: &str,
-        tags: I,
-        read_later: bool,
-    ) -> Result<String>;
-}
-
-/// Pinboard API client; construct with your API token.
+/// A Pinboard API client
+///
+/// Construct [`Client`] instances with the API location & your API token:
+///
+/// ```
+/// use pin::pinboard::Client;
+/// let client = Client::new("https://api.pinboard.in", "jdoe:DECADE90C0DEDDABB1ED");
+/// ```
+///
+/// This implementation uses [version 1] of the Pinboard API.
+///
+/// [version 1]: https://pinboard.in/api
+///
+/// The Pinboard API advertises rate limits (although I haven't seen them enforced in the
+/// wild). This client implementation only deals in individual requests; for retry & backoff logic,
+/// see [`send_links_with_backoff`].
+#[derive(Debug)]
 pub struct Client {
+    url: Url,
+    client: reqwest::Client,
     token: String,
 }
 
-impl Client {
-    pub fn new(token: String) -> Client {
-        Client { token: token }
+impl Display for Client {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> StdResult<(), std::fmt::Error> {
+        write!(f, "Pinboard Client({}:{})", self.url, &self.token[0..8])
     }
 }
 
-impl Pinboard for Client {
-    fn get_all_tags(&self) -> Result<Vec<(String, usize)>> {
-        let ep = "/v1/tags/get";
-        let req = format!(
-            "https://api.pinboard.in{}?auth_token={}&format=json",
-            ep, self.token
-        );
+/// A link and all of its associated metadata
+#[derive(Debug)]
+pub struct Post {
+    /// The link itself
+    link: Url,
+    /// The link title
+    title: Title,
+    /// Tags associated with this link
+    tags: Vec<Tag>,
+    /// "Read later" bit
+    read_later: bool,
+}
 
-        debug!("requesting {}...", req);
-        let client = reqwest::blocking::Client::new();
-        let rsp = client.get(&req).header(USER_AGENT, PIN_UA).send()?;
+impl Display for Post {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> StdResult<(), std::fmt::Error> {
+        write!(f, "{{Pinboard Post: {}|{}}}", self.link, self.title)
+    }
+}
 
-        (rsp.status() == reqwest::StatusCode::OK)
-            .as_option()
-            .context(Http {
-                ep: String::from(ep),
-                status: rsp.status(),
-            })?;
-
-        // Strip the UTF-8 Byte Order Mark, if present, before handing off to the JSON parser
-        let buf = rsp.bytes()?;
-        let buf = if buf[0] == 0xef && buf[1] == 0xbb && buf[2] == 0xbf {
-            buf.slice(3..)
-        } else {
-            buf
-        };
-
-        let rsp = std::str::from_utf8(&buf)?;
-
-        counts_for_json(rsp)
-    } // End function `get_all_tags'.
-
-    fn rename_tag(&mut self, from: &str, to: &str) -> Result<String> {
-        let ep = "/v1/tags/rename";
-        let req = format!(
-            "https://api.pinboard.in{}?auth_token={}&{}",
-            ep,
-            self.token,
-            encode(&[("old", from), ("new", to), ("format", "json")])?
-        );
-
-        debug!("requesting {}...", req);
-        let client = reqwest::blocking::Client::new();
-        let rsp = client.get(&req).header(USER_AGENT, PIN_UA).send()?;
-        (rsp.status() == reqwest::StatusCode::OK)
-            .as_option()
-            .context(Http {
-                ep: String::from(ep),
-                status: rsp.status(),
-            })?;
-
-        // Strip the UTF-8 Byte Order Mark, if present, before handing off to the JSON parser
-        let buf = rsp.bytes()?;
-        let buf = if buf[0] == 0xef && buf[1] == 0xbb && buf[2] == 0xbf {
-            buf.slice(3..)
-        } else {
-            buf
-        };
-
-        let rsp = std::str::from_utf8(&buf)?;
-
-        debug!("requesting {}...done: {}", req, rsp);
-
-        let val = json::parse(rsp)?;
-        match val {
-            json::JsonValue::Object(obj) => Ok(obj["result"].to_string()),
-            _ => Err(Error::BadJsonType {
-                item: val,
-                back: Backtrace::generate(),
-            }),
+impl Post {
+    pub fn new<I>(link: Url, title: Title, tags: I, read_later: bool) -> Post
+    where
+        I: Iterator<Item = Tag>,
+    {
+        Post {
+            link: link,
+            title: title,
+            tags: tags.collect(),
+            read_later: read_later,
         }
     }
+}
 
-    fn send<I: Iterator<Item = String>>(
-        &mut self,
-        url: &str,
-        title: &str,
-        tags: I,
-        rl: bool,
-    ) -> Result<String> {
-        let ep = "/v1/posts/add";
-        let args = &[
-            ("url", url),
-            ("description", title),
-            (
-                "tags",
-                &tags.fold(String::from(""), |mut acc, x| {
-                    acc.push(' ');
-                    acc.push_str(&x);
-                    acc
-                }),
-            ),
-            (
-                "toread",
-                match rl {
-                    true => "yes",
-                    false => "no",
-                },
-            ),
-        ];
-        let enc_url = serde_urlencoded::to_string(args)?;
-        let req = format!(
-            "https://api.pinboard.in{}?auth_token={}&format=json&{}",
-            ep, self.token, enc_url
-        );
+impl Client {
+    /// Construct a new [`Client`] instance.
+    pub fn new<U: IntoUrl>(url: U, token: &str) -> Result<Client> {
+        use crate::vars::PIN_UA;
+        Ok(Client {
+            url: url.into_url().context(BadUrlSnafu {})?,
+            client: reqwest::Client::builder()
+                .user_agent(PIN_UA)
+                .build()
+                .context(HttpSnafu {})?,
+            token: token.to_string(),
+        })
+    }
+    /// Retrieve all the account's tags together with their use count
+    #[tracing::instrument]
+    pub async fn get_all_tags(&self) -> Result<HashMap<String, usize>> {
+        let rsp = self
+            .client
+            .get(
+                self.url
+                    .join("v1/tags/get")
+                    .expect("Invalid URL in get_all_tags()"),
+            )
+            .query(&[("format", "json"), ("auth_token", &self.token)])
+            .send()
+            .await
+            .context(HttpSnafu {})?;
 
-        debug!("Requesting {}...", &req);
-        let client = reqwest::blocking::Client::new();
-        let rsp = client.get(&req).header(USER_AGENT, PIN_UA).send()?;
-        (rsp.status() == reqwest::StatusCode::OK)
-            .as_option()
-            .context(Http {
-                ep: String::from(ep),
+        // At this point, I have the response status code & headers:
+        if StatusCode::OK != rsp.status() {
+            eprintln!("{:#?}", rsp);
+            return PinboardSnafu {
                 status: rsp.status(),
-            })?;
-
-        // Strip the UTF-8 Byte Order Mark, if present, before handing off to the JSON parser
-        let buf = rsp.bytes()?;
-        let buf = if buf[0] == 0xef && buf[1] == 0xbb && buf[2] == 0xbf {
-            buf.slice(3..)
-        } else {
-            buf
-        };
-
-        let rsp = std::str::from_utf8(&buf)?;
-
-        debug!("requesting {}...done: {}", req, rsp);
-
-        let val = json::parse(rsp)?;
-        match val {
-            json::JsonValue::Object(obj) => Ok(obj["result_code"].to_string()),
-            _ => Err(Error::BadJsonType {
-                item: val,
-                back: Backtrace::generate(),
-            }),
+            }
+            .fail();
         }
+
+        Ok(rsp
+            .json::<HashMap<String, usize>>()
+            .await
+            .context(HttpSnafu {})?)
+    }
+    /// Send a single post
+    #[tracing::instrument]
+    pub async fn send_post(&self, post: &Post) -> Result<()> {
+        let rsp = self
+            .client
+            .get(
+                self.url
+                    .join("v1/posts/add")
+                    .expect("Invalid URL in send_posts()"),
+            )
+            .query(&[
+                ("url", post.link.as_ref()),
+                ("description", post.title.as_ref()),
+                (
+                    "tags",
+                    &post.tags.iter().fold(String::from(""), |mut acc, x| {
+                        acc.push(' ');
+                        acc.push_str(x.as_ref());
+                        acc
+                    }),
+                ),
+                (
+                    "toread",
+                    match post.read_later {
+                        true => "yes",
+                        false => "no",
+                    },
+                ),
+                ("auth_token", &self.token),
+                ("format", "json"),
+            ])
+            .send()
+            .await
+            .context(HttpSnafu {})?;
+        let status = rsp.status();
+        if status.is_success() {
+            return Ok(());
+        } else if status == StatusCode::TOO_MANY_REQUESTS {
+            return Err(Error::RateLimit);
+        } else {
+            return PinboardSnafu { status: status }.fail();
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use mockito::Matcher;
+    use test_log::test;
+
+    #[test(tokio::test)]
+    async fn test_get_all_tags() {
+        // use RUST_LOG="mockito=debug" cargo test
+        let _mock = mockito::mock("GET",
+                                  Matcher::Regex(r"/v1/tags/get.*$".to_string()))
+            .match_query(mockito::Matcher::AllOf(vec![
+                mockito::Matcher::UrlEncoded("format".into(), "json".into()),
+                mockito::Matcher::UrlEncoded(
+                    "auth_token".into(),
+                    "sp1ff:FFFFFFFFFFFFFFFFFFFF".into(),
+                ),
+            ]))
+            .with_status(200)
+            // // N.B. The real response also includes a date header, like "Sun, 07 Aug 2022 14:33:31 GMT"
+            .with_header("content-type", "text/json; charset=utf-8")
+            .with_header("server", "Apache/2.4.18 (Ubuntu)")
+            .with_body("{\"1997\":1,\"2012\":1,\"2017\":1,\"2018\":3,\"2019\":6,\"2020\":51,\"2020-08-24\":1,\"2021\":103,\"2021-recall\":1}\t")
+            .create();
+
+        let client = Client::new(&mockito::server_url(), "sp1ff:FFFFFFFFFFFFFFFFFFFF").unwrap();
+        let rsp = client.get_all_tags().await;
+        assert!(rsp.is_ok());
+        let rsp = rsp.unwrap();
+        assert_eq!(rsp.get("2020"), Some(&51));
     }
 }

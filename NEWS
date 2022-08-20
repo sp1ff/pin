@@ -1,15 +1,26 @@
 pin News -- history of user-visible changes           -*- outline -*-
 
-* 0.1.3
+* 0.2 builds
 
-** Bugfixes
+** 0.2.0
 
-*** Fix the build
+Complete re-write. The tool is now:
+
+  - async
+  - supports bulk send
+  - supports backoff & retry on bulk send
+* 0.1 builds
+
+** 0.1.3
+
+*** Bugfixes
+
+**** Fix the build
 
 The `clap` project released a new beta at the end of last year which
 (unbeknownst to me) broke the build. I've updated the dependency,
 fixed the build, and pinned the dependency version.
-* 0.1.2: Assorted bugfixes
+** 0.1.2: Assorted bugfixes
 
   - not sure if this has always been the case, but the Pinboard API is
      returning a UTF-8 BOM at the start of the response text; strip
@@ -17,4 +28,4 @@ fixed the build, and pinned the dependency version.
   - the response JSON doesn't always return a Short for use counts;
     sometimes it returns a Number-- handle that.
 
-* 0.1.1: Initial release of `pin'
+** 0.1.1: Initial release of `pin'
