@@ -2,3 +2,5 @@ Makefile.in
 README.md
 rusty-tags.emacs
 
+linkedin.json
+linkedin-and-jira.json

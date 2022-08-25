@@ -81,7 +81,7 @@ pub enum Error {
     RateLimit,
 }
 
-type Result<T> = StdResult<T, Error>;
+pub type Result<T> = StdResult<T, Error>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                    Pinboard API data types                                     //
@@ -171,6 +171,12 @@ impl std::convert::TryFrom<String> for Tag {
             Tag::validate_text(&s, 255)?;
             Ok(Tag { value: s })
         }
+    }
+}
+
+impl std::convert::From<Tag> for String {
+    fn from(t: Tag) -> Self {
+        t.value
     }
 }
 
@@ -281,7 +287,7 @@ mod entity_tests {
 /// The Pinboard API advertises rate limits (although I haven't seen them enforced in the
 /// wild). This client implementation only deals in individual requests; for retry & backoff logic,
 /// see [`send_links_with_backoff`].
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Client {
     url: Url,
     client: reqwest::Client,
@@ -403,6 +409,58 @@ impl Client {
             .send()
             .await
             .context(HttpSnafu {})?;
+        let status = rsp.status();
+        if status.is_success() {
+            return Ok(());
+        } else if status == StatusCode::TOO_MANY_REQUESTS {
+            return Err(Error::RateLimit);
+        } else {
+            return PinboardSnafu { status: status }.fail();
+        }
+    }
+    /// Retrieve all posts; filter by zero or more tags. The docs say up to three tags are supported,
+    /// but this implementation doesn't enforce that.
+    #[tracing::instrument]
+    pub async fn all_posts<T>(&self, mut tags: T) -> Result<reqwest::Response>
+    where
+        T: Iterator<Item = Tag> + Debug,
+    {
+        let mut query_params = vec![
+            ("auth_token", self.token.clone()),
+            ("format", "json".into()),
+        ];
+        while let Some(tag) = tags.next() {
+            query_params.push(("tag", tag.into()));
+        }
+        Ok(self
+            .client
+            .get(
+                self.url
+                    .join("v1/posts/all")
+                    .expect("Invalid URL in send_posts()"),
+            )
+            .query(&query_params)
+            .send()
+            .await
+            .context(HttpSnafu)?)
+    }
+    #[tracing::instrument]
+    pub async fn delete_post(&self, url: Url) -> Result<()> {
+        let rsp = self
+            .client
+            .get(
+                self.url
+                    .join("v1/posts/delete")
+                    .expect("Invalid URL in delete_post()"),
+            )
+            .query(&[
+                ("url", url.as_ref()),
+                ("auth_token", &self.token),
+                ("format", "json"),
+            ])
+            .send()
+            .await
+            .context(HttpSnafu)?;
         let status = rsp.status();
         if status.is_success() {
             return Ok(());

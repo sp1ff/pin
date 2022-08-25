@@ -26,13 +26,14 @@ use pin::{
     config::{Config, Target},
     get_tags,
     pinboard::{Tag, Title},
+    url_stream::GreedyUrlStream,
     PinboardPost,
 };
 use reqwest::Url;
 
 use clap::{App, Arg, ArgMatches};
 use snafu::{Backtrace, IntoError, ResultExt, Snafu};
-use tracing::trace;
+use tracing::{info, trace};
 
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -107,6 +108,11 @@ enum Error {
         source: pin::pinboard::Error,
         backtrace: Backtrace,
     },
+    #[snafu(display("While parsing the command arguments: {}", source))]
+    UrlStream {
+        source: pin::url_stream::Error,
+        backtrace: Backtrace,
+    },
     #[snafu(display("Target {name} is unknown."))]
     UnknownTarget { name: String, backtrace: Backtrace },
 }
@@ -127,6 +133,7 @@ type Result<T> = StdResult<T, Error>;
 //                                       utility functions                                        //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Add the `get-tags` sub-command to the [`App`]
 fn add_get_tags(app: App<'_>) -> App<'_> {
     app.subcommand(
     App::new("get-tags")
@@ -154,6 +161,7 @@ fn add_get_tags(app: App<'_>) -> App<'_> {
         ))
 }
 
+/// Add the `send` sub-command to the [`App`]
 fn add_send(app: App<'_>) -> App<'_> {
     app.subcommand(
         App::new("send")
@@ -218,6 +226,28 @@ fn add_send(app: App<'_>) -> App<'_> {
                     .short('p')
                     .help("Your Instapaper password")
                     .takes_value(true),
+            ),
+    )
+}
+
+/// Add the `delete` sub-command to the [`App`]
+fn add_delete(app: App<'_>) -> App<'_> {
+    app.subcommand(
+        App::new("delete")
+            .about("Delete one or more URLs from Pinboard")
+            .long_about("Delete one or more URLs from Pinboard (deletion from Instapaper is not available-- once you've posted to Instapaper, it's there forever).")
+            .arg(Arg::new("dry-run")
+                 .short('n')
+                 .long("dry-run")
+                 .help("Just print the URLs that would be deleted")
+                 .long_help("Don't actually delete anything; just print the URLs that would be deleted"))
+            .arg(
+                Arg::new("url-or-tag")
+                    .index(1)
+                    .help("URL or tag to be deleted from Pinboard")
+                    .long_help("The URLs to be deleted may be given in one of two ways; either as an explicit URL, or as a tag, in which case all URLs with that tag will be deleted")
+                    .multiple_values(true)
+                    .required(true),
             ),
     )
 }
@@ -331,6 +361,157 @@ fn make_app(dot_pin: Option<&mut PathBuf>) -> App<'_> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                          sub-commands                                          //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// `send` sub-command implementation
+async fn send_tags(sub: &ArgMatches, cfg: Config, client: Client) -> Result<()> {
+    // If they specified a target, and it doesn't exist, that's an error. If they just didn't
+    // specify one, that's cool too.
+    let target: Option<&Target> = match sub.get_one::<String>("target") {
+        Some(tar_name) => Some(
+            cfg.get_target(tar_name).ok_or(
+                UnknownTargetSnafu {
+                    name: (*tar_name).clone(),
+                }
+                .build(),
+            )?,
+        ),
+        None => None,
+    };
+
+    let mut tags = match sub.get_many::<String>("tag") {
+        Some(iter) => iter
+            .cloned()
+            .map(|s| -> Result<Tag> { Ok(Tag::try_from(s).context(PinboardSnafu)?) })
+            .collect::<Result<Vec<Tag>>>()?,
+        None => Vec::new(),
+    };
+
+    if let Some(target) = target {
+        tags.extend(target.get_tags().cloned());
+    }
+
+    let read_later = if let Some(target) = target {
+        target.read_later()
+    } else {
+        false
+    };
+    let read_later = read_later || sub.is_present("read-later");
+
+    let insty = if sub.is_present("instapaper") {
+        let env_username = std::env::var("INSTAPAPER_USERNAME");
+        let username = sub
+            .get_one::<String>("username")
+            .or_else(|| match env_username.as_ref() {
+                Ok(s) => Some(s),
+                Err(_) => None,
+            })
+            .ok_or(Error::NoUsername)?;
+        let env_password = std::env::var("INSTAPAPER_PASSWORD");
+        let password = sub
+            .get_one::<String>("password")
+            .or_else(|| match env_password.as_ref() {
+                Ok(s) => Some(s),
+                Err(_) => None,
+            })
+            .ok_or(Error::NoPassword)?;
+        Some(
+            pin::instapaper::Client::new("https://www.instapaper.com", &username, &password)
+                .context(InstapaperSnafu)?,
+        )
+    } else {
+        None
+    };
+
+    let atom = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(1000));
+
+    // We build-up our collection of `Post`s before attempting to send; I chose to to this so
+    // that any one argument that is invalid will be detected before we even start to send
+    // requests. I suppose I could send all the legit links, and only fail when I discover a bad
+    // one, but that sems inconvenient to the caller ("OK... I successfully posted *these*
+    // links, then fix the bad one, then re-try everythign after...")
+    let posts = sub
+        .get_many::<String>("url")
+        .unwrap() // This option is required
+        .map(|arg| -> Result<PinboardPost> {
+            // We need an iterator yielding Posts. Let's figure out the link & the title:
+            let split: (&str, &str) = arg
+                .find(" | ")
+                .and_then(|idx| Some((&arg[0..idx], &arg[idx + 3..])))
+                .or_else(|| {
+                    sub.get_one::<String>("title")
+                        .and_then(|title| Some((arg.as_ref(), title.as_ref())))
+                })
+                .ok_or(
+                    MissingTitleSnafu {
+                        link: (*arg).clone(),
+                    }
+                    .build(),
+                )?;
+            // `split.0` is a &str that should be an Url, and `split.1` is a &str that should be
+            // a Title
+            let pin_post = pin::pinboard::Post::new(
+                Url::parse(split.0).context(BadLinkSnafu {
+                    link: split.0.to_string(),
+                })?,
+                Title::from_str(split.1).context(PinboardSnafu {})?,
+                tags.iter().cloned(),
+                read_later,
+            );
+
+            let insty_post = match insty {
+                Some(_) => Some(
+                    pin::instapaper::Post::new(split.0, Some(split.1), Some(pin::vars::PIN_UA))
+                        .context(InstapaperSnafu)?,
+                ),
+                None => None,
+            };
+
+            Ok(PinboardPost::new(
+                &client,
+                pin_post,
+                insty
+                    .as_ref()
+                    .and_then(|client| Some((client, insty_post.unwrap(), atom.clone(), 1000, 5))),
+            ))
+        })
+        .collect::<Result<Vec<PinboardPost>>>()?;
+
+    pin::make_requests_with_backoff(posts.into_iter(), 3000, 10000, 5)
+        .await
+        .context(PinSnafu)
+        .and_then(|_| Ok(()))
+}
+
+/// `delete` sub-command implementation
+async fn delete_tags(sub: &ArgMatches, client: Client) -> Result<()> {
+    let dry_run = sub.is_present("dry-run");
+    let mut stream =
+        GreedyUrlStream::new(client.clone(), sub.get_many("url-or-tag").unwrap().cloned()).unwrap();
+
+    use futures::stream::StreamExt;
+    let mut count = 0;
+    while let Some(url) = stream.next().await {
+        let url = url.context(UrlStreamSnafu)?;
+        if dry_run {
+            info!("Would delete {}", &url);
+        } else {
+            info!("Deleting {}", &url);
+            client.delete_post(url).await.context(PinboardSnafu)?
+        }
+        count += 1;
+    }
+
+    if dry_run {
+        info!("Would have deleted {} URLs.", count);
+    } else {
+        info!("Deleted {} URLs.", count);
+    }
+    Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                          The Big Kahuna                                        //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -344,6 +525,7 @@ async fn main() -> Result<()> {
     let mut app = make_app(dot_pin.as_mut());
     app = add_get_tags(app);
     app = add_send(app);
+    app = add_delete(app);
 
     // & parse the command line.
     let matches = app.get_matches(); // NB. --help & --version handled here (we won't return if
@@ -412,122 +594,9 @@ async fn main() -> Result<()> {
             .await
             .context(PinSnafu)
     } else if let Some(sub) = matches.subcommand_matches("send") {
-        // If they specified a target, and it doesn't exist, that's an error. If they just didn't
-        // specify one, that's cool too.
-        let target: Option<&Target> = match sub.get_one::<String>("target") {
-            Some(tar_name) => Some(
-                cfg.get_target(tar_name).ok_or(
-                    UnknownTargetSnafu {
-                        name: (*tar_name).clone(),
-                    }
-                    .build(),
-                )?,
-            ),
-            None => None,
-        };
-
-        let mut tags = match sub.get_many::<String>("tag") {
-            Some(iter) => iter
-                .cloned()
-                .map(|s| -> Result<Tag> { Ok(Tag::try_from(s).context(PinboardSnafu)?) })
-                .collect::<Result<Vec<Tag>>>()?,
-            None => Vec::new(),
-        };
-
-        if let Some(target) = target {
-            tags.extend(target.get_tags().cloned());
-        }
-
-        let read_later = if let Some(target) = target {
-            target.read_later()
-        } else {
-            false
-        };
-        let read_later = read_later || sub.is_present("read-later");
-
-        let insty = if sub.is_present("instapaper") {
-            let env_username = std::env::var("INSTAPAPER_USERNAME");
-            let username = sub
-                .get_one::<String>("username")
-                .or_else(|| match env_username.as_ref() {
-                    Ok(s) => Some(s),
-                    Err(_) => None,
-                })
-                .ok_or(Error::NoUsername)?;
-            let env_password = std::env::var("INSTAPAPER_PASSWORD");
-            let password = sub
-                .get_one::<String>("password")
-                .or_else(|| match env_password.as_ref() {
-                    Ok(s) => Some(s),
-                    Err(_) => None,
-                })
-                .ok_or(Error::NoPassword)?;
-            Some(
-                pin::instapaper::Client::new("https://www.instapaper.com", &username, &password)
-                    .context(InstapaperSnafu)?,
-            )
-        } else {
-            None
-        };
-
-        let atom = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(1000));
-
-        // We build-up our collection of `Post`s before attempting to send; I chose to to this so
-        // that any one argument that is invalid will be detected before we even start to send
-        // requests. I suppose I could send all the legit links, and only fail when I discover a bad
-        // one, but that sems inconvenient to the caller ("OK... I successfully posted *these*
-        // links, then fix the bad one, then re-try everythign after...")
-        let posts = sub
-            .get_many::<String>("url")
-            .unwrap() // This option is required
-            .map(|arg| -> Result<PinboardPost> {
-                // We need an iterator yielding Posts. Let's figure out the link & the title:
-                let split: (&str, &str) = arg
-                    .find(" | ")
-                    .and_then(|idx| Some((&arg[0..idx], &arg[idx + 3..])))
-                    .or_else(|| {
-                        sub.get_one::<String>("title")
-                            .and_then(|title| Some((arg.as_ref(), title.as_ref())))
-                    })
-                    .ok_or(
-                        MissingTitleSnafu {
-                            link: (*arg).clone(),
-                        }
-                        .build(),
-                    )?;
-                // `split.0` is a &str that should be an Url, and `split.1` is a &str that should be
-                // a Title
-                let pin_post = pin::pinboard::Post::new(
-                    Url::parse(split.0).context(BadLinkSnafu {
-                        link: split.0.to_string(),
-                    })?,
-                    Title::from_str(split.1).context(PinboardSnafu {})?,
-                    tags.iter().cloned(),
-                    read_later,
-                );
-
-                let insty_post = match insty {
-                    Some(_) => Some(
-                        pin::instapaper::Post::new(split.0, Some(split.1), Some(pin::vars::PIN_UA))
-                            .context(InstapaperSnafu)?,
-                    ),
-                    None => None,
-                };
-
-                Ok(PinboardPost::new(
-                    &client,
-                    pin_post,
-                    insty.as_ref().and_then(|client| {
-                        Some((client, insty_post.unwrap(), atom.clone(), 1000, 5))
-                    }),
-                ))
-            })
-            .collect::<Result<Vec<PinboardPost>>>()?;
-
-        pin::make_requests_with_backoff(posts.into_iter(), 3000, 10000, 5)
-            .await
-            .context(PinSnafu)
-            .and_then(|_| Ok(()))
+        send_tags(sub, cfg, client).await
+    } else if let Some(sub) = matches.subcommand_matches("delete") {
+        delete_tags(sub, client).await
     } else {
         Err(Error::NoSubCommand)
     }

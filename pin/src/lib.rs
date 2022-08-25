@@ -63,6 +63,8 @@
 pub mod config;
 pub mod instapaper;
 pub mod pinboard;
+#[path = "url-stream.rs"]
+pub mod url_stream;
 pub mod vars;
 
 use async_trait::async_trait;
@@ -589,10 +591,16 @@ mod test {
             deltas = mock.lock().unwrap().deltas();
         }
 
+        debug!("deltas[0]: {}", deltas[0].as_millis());
+        debug!("deltas[1]: {}", deltas[1].as_millis());
+        debug!("deltas[2]: {}", deltas[2].as_millis());
+        debug!("deltas[3]: {}", deltas[3].as_millis());
+        debug!("deltas[4]: {}", deltas[4].as_millis());
+        debug!("deltas[5]: {}", deltas[5].as_millis());
         assert_eq!(6, deltas.len());
         assert!(deltas[0].as_millis().checked_sub(6000).unwrap() <= 10);
         assert!(deltas[1].as_millis() <= 10);
-        assert!(deltas[2].as_millis().checked_sub(3000).unwrap() <= 10);
+        assert!(deltas[2].as_millis().checked_sub(2990).unwrap() <= 20);
         assert!(deltas[3].as_millis() <= 10);
         assert!(deltas[4].as_millis().checked_sub(1000).unwrap() <= 10);
         assert!(deltas[5].as_millis().checked_sub(2000).unwrap() <= 10);

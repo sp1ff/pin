@@ -13,14 +13,22 @@ keywords = ["cli", "pinboard", "utility", "bookmarks"]
 categories = ["command-line-utilities"]
 exclude = ["*~", "Cargo.toml.in", "Cargo.toml.orig", "rusty-tags.emacs", "Makefile.am", "Makefile.in", "Makefile", "vars.rs.in"]
 
+[features]
+personal-link-tests = []
+
 [dependencies]
 async-trait = "0.1.57"
+bytes = "1.2.1"
 clap = "3.2"
+futures = "0.3.23"
 home = "0.5.3"
 indicatif = "0.17.0"
+itertools = "0.10.3"
 json = "0.12.4"
+pin-project = "1.0.12"
 reqwest = { version = "0.11", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.85"
 snafu = { version = "0.7.1", features = ["backtraces"] }
 strfmt = "0.1.6"
 toml = "0.4"
