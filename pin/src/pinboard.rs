@@ -83,6 +83,21 @@ pub enum Error {
 
 pub type Result<T> = StdResult<T, Error>;
 
+struct Response(reqwest::Response);
+
+impl std::convert::From<Response> for Result<()> {
+    fn from(rsp: Response) -> Self {
+        let status = rsp.0.status();
+        if status.is_success() {
+            return Ok(());
+        } else if status == StatusCode::TOO_MANY_REQUESTS {
+            return Err(Error::RateLimit);
+        } else {
+            return PinboardSnafu { status: status }.fail();
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                    Pinboard API data types                                     //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -378,45 +393,39 @@ impl Client {
     /// Send a single post
     #[tracing::instrument]
     pub async fn send_post(&self, post: &Post) -> Result<()> {
-        let rsp = self
-            .client
-            .get(
-                self.url
-                    .join("v1/posts/add")
-                    .expect("Invalid URL in send_posts()"),
-            )
-            .query(&[
-                ("url", post.link.as_ref()),
-                ("description", post.title.as_ref()),
-                (
-                    "tags",
-                    &post.tags.iter().fold(String::from(""), |mut acc, x| {
-                        acc.push(' ');
-                        acc.push_str(x.as_ref());
-                        acc
-                    }),
-                ),
-                (
-                    "toread",
-                    match post.read_later {
-                        true => "yes",
-                        false => "no",
-                    },
-                ),
-                ("auth_token", &self.token),
-                ("format", "json"),
-            ])
-            .send()
-            .await
-            .context(HttpSnafu {})?;
-        let status = rsp.status();
-        if status.is_success() {
-            return Ok(());
-        } else if status == StatusCode::TOO_MANY_REQUESTS {
-            return Err(Error::RateLimit);
-        } else {
-            return PinboardSnafu { status: status }.fail();
-        }
+        Response(
+            self.client
+                .get(
+                    self.url
+                        .join("v1/posts/add")
+                        .expect("Invalid URL in send_posts()"),
+                )
+                .query(&[
+                    ("url", post.link.as_ref()),
+                    ("description", post.title.as_ref()),
+                    (
+                        "tags",
+                        &post.tags.iter().fold(String::from(""), |mut acc, x| {
+                            acc.push(' ');
+                            acc.push_str(x.as_ref());
+                            acc
+                        }),
+                    ),
+                    (
+                        "toread",
+                        match post.read_later {
+                            true => "yes",
+                            false => "no",
+                        },
+                    ),
+                    ("auth_token", &self.token),
+                    ("format", "json"),
+                ])
+                .send()
+                .await
+                .context(HttpSnafu {})?,
+        )
+        .into()
     }
     /// Retrieve all posts; filter by zero or more tags. The docs say up to three tags are supported,
     /// but this implementation doesn't enforce that.
@@ -446,29 +455,43 @@ impl Client {
     }
     #[tracing::instrument]
     pub async fn delete_post(&self, url: Url) -> Result<()> {
-        let rsp = self
-            .client
-            .get(
-                self.url
-                    .join("v1/posts/delete")
-                    .expect("Invalid URL in delete_post()"),
-            )
-            .query(&[
-                ("url", url.as_ref()),
-                ("auth_token", &self.token),
-                ("format", "json"),
-            ])
-            .send()
-            .await
-            .context(HttpSnafu)?;
-        let status = rsp.status();
-        if status.is_success() {
-            return Ok(());
-        } else if status == StatusCode::TOO_MANY_REQUESTS {
-            return Err(Error::RateLimit);
-        } else {
-            return PinboardSnafu { status: status }.fail();
-        }
+        Response(
+            self.client
+                .get(
+                    self.url
+                        .join("v1/posts/delete")
+                        .expect("Invalid URL in delete_post()"),
+                )
+                .query(&[
+                    ("url", url.as_ref()),
+                    ("auth_token", &self.token),
+                    ("format", "json"),
+                ])
+                .send()
+                .await
+                .context(HttpSnafu)?,
+        )
+        .into()
+    }
+    #[tracing::instrument]
+    pub async fn rename_tag(&self, from: &Tag, to: &Tag) -> Result<()> {
+        Response(
+            self.client
+                .get(
+                    self.url
+                        .join("/v1/tags/rename")
+                        .expect("Invalid URL in rename_tag"),
+                )
+                .query(&[
+                    ("old", from.as_ref()),
+                    ("new", to.as_ref()),
+                    ("format", "json"),
+                ])
+                .send()
+                .await
+                .context(HttpSnafu)?,
+        )
+        .into()
     }
 }
 

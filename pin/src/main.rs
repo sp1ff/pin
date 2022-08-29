@@ -252,6 +252,29 @@ fn add_delete(app: App<'_>) -> App<'_> {
     )
 }
 
+/// Add the `rename-tag` sub-command to the [`App`]
+fn add_rename_tag(app: App<'_>) -> App<'_> {
+    app.subcommand(
+        App::new("rename-tag")
+            .about("Rename a tag")
+            .long_about("Rename a Pinboard tag as `rename-tag FROM TO`. Tags may be up to 255 grapheme clusters in length and may not contain commas nor whitespace. Tags may be designated as private by beginning them with a '.'")
+            .arg(
+                Arg::new("from")
+                    .help("Source tag (i.e. the tag to be renamed)")
+                    .index(1)
+                    .requires("to")
+                    .required(true),
+            )
+            .arg(
+                Arg::new("to")
+                    .help("Target tag name (i.e. the new name)")
+                    .index(2)
+                    .requires("from")
+                    .required(true),
+            ),
+    )
+}
+
 /// Configure logging. This is still in-progress, but ATM the rules are:
 ///
 /// 1. Configure defaults via command-line options:
@@ -526,6 +549,7 @@ async fn main() -> Result<()> {
     app = add_get_tags(app);
     app = add_send(app);
     app = add_delete(app);
+    app = add_rename_tag(app);
 
     // & parse the command line.
     let matches = app.get_matches(); // NB. --help & --version handled here (we won't return if
@@ -597,6 +621,10 @@ async fn main() -> Result<()> {
         send_tags(sub, cfg, client).await
     } else if let Some(sub) = matches.subcommand_matches("delete") {
         delete_tags(sub, client).await
+    } else if let Some(sub) = matches.subcommand_matches("rename-tag") {
+        let from = Tag::from_str(&sub.get_one::<String>("from").unwrap()).context(PinboardSnafu)?;
+        let to = Tag::from_str(&sub.get_one::<String>("to").unwrap()).context(PinboardSnafu)?;
+        client.rename_tag(&from, &to).await.context(PinboardSnafu)
     } else {
         Err(Error::NoSubCommand)
     }
