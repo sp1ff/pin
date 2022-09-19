@@ -12,7 +12,8 @@ cargo_verbose_1 = --verbose
 EXTRA_DIST = Cargo.lock
 bin_PROGRAMS = pin
 
-pin_SOURCES = Cargo.toml src/vars.rs src/main.rs src/lib.rs src/config.rs src/pinboard.rs src/instapaper.rs
+pin_SOURCES = Cargo.toml src/vars.rs src/main.rs src/lib.rs src/config.rs src/instapaper.rs src/pinboard.rs \
+	src/url-stream.rs
 
 pin$(EXEEXT): $(pin_SOURCES)
 	cd $(top_srcdir)/pin && \

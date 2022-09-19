@@ -1,0 +1,106 @@
+.\" Copyright (C) 2022 Michael Herstine <sp1ff@pobox.com>
+.\" You may distribute this file under the terms of the GNU Free
+.\" Documentation License.
+.TH pin 1 2022-09-02 "pin 0.2.0" "pin Manual"
+.SH NAME
+pin send \- Send one ore more URLs to Pinboard as well as, optionally,
+Instapaper.
+
+.SH SYNOPSIS
+.B "pin send"
+[-h|--help]
+.RS 8
+.br
+[-i, --with-instapaper] [-p PASSWD|--password=PASSWD] [-u USER|--user=USER]
+.br
+[-t TARGET|--target=TARGET]
+.br
+[-R, --read-later]
+.br
+[-t TAG|--tag=TAG]
+.br
+[-T TITLE|--title=TITLE]
+.br
+LINK...
+.RE
+
+.SH DESCRIPTION
+
+Send one or more links to Pinboard as well as, optionally, Instapaper.
+Arguments may be given in one of two ways. The first is simply the
+URL, in which case the title will be taken from the -T option (which
+must be provided, in this case; it is illegal to send a link with no
+title). The other is to give an argument of the form "URL | TITLE" in
+which case the TITLE given in this argument will be preferred to the
+-T option.
+
+.SH OPTIONS
+
+.PP
+\-h
+.RS 4
+Print a brief usage message on
+.I stdout
+& exit with status zero.
+.RE
+.PP
+\-\-help
+.RS 4
+Display more detailed help.
+.RE
+.PP
+[-i|--with-instapaper]
+.RS 4
+Send these links to Instapaper as well as Pinboard.
+.RE
+.PP
+[-u USERNAME|--username=USERNAME]
+.RS 4
+Instapaper username. You can also specify your Instapaper username
+in your configuration file, as well as in the environment variable
+.I INSTAPAPER_USERNAME
+.RE
+.PP
+[-p PASSWORD|--password=PASSWORD]
+.RS 4
+Instapaper password. You can also specify your Instapaper password
+in your configuration file, as well as in the environment variable
+.I INSTAPAPER_PASSWORD
+.RE
+.PP
+[-r TARGET|--target=TARGET]
+.RS 4
+Specify a "target" for these links. A target is a combination of tags,
+whether or not they should be marked to "read later", and whether or
+not they should also be sent to Instapaper. See the Info manual for
+details on how to configure targets for your links.
+.RE
+.PP
+[-R, --read-later]
+.RS 4
+Flag all given posts as "to be read later" on Pinboard.
+.RE
+.PP
+[-t TAG, --tag=TAG]
+.RS 4
+Speciy a tag to for the given links. Tags must be
+fewer than 256 characters in length, and may not contain commas or
+whitespace. Tags that begin with a period are private.
+.RE
+.PP
+[-T TITLE, --title=TITLE]
+.RS 4
+Specify the "title" or "description" for all given links on
+Pinboard. Each link must have a title. When giving more than one link,
+it likely makes more sense to give the titles with the links as "URL |
+TITLE".
+.RE
+
+.SH AUTHOR
+.B pin
+is written & maintained by Michael Herstine <sp1ff@pobox.com>. It
+is maintained at https://github.com/sp1ff/pin.
+
+.SH "SEE ALSO"
+
+.BR pin "(1), " pin-delete "(1), " pin-rename-tag "(1), " pin-send "(1)"

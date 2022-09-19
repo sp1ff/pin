@@ -1,0 +1,46 @@
+.\" Copyright (C) 2022 Michael Herstine <sp1ff@pobox.com>
+.\" You may distribute this file under the terms of the GNU Free
+.\" Documentation License.
+.TH pin-delete 1 2022-09-02 "pin 0.2.0" "pin Manual"
+.SH NAME
+pin delete \- Delete one or more URLS from Pinboard
+.SH SYNOPSIS
+.BR "pin delete " "[-h|--help] [-n|--dry-run] URL-OR-TAGS..."
+
+.SH DESCRIPTION
+
+Delete one or more URLs from Pinboard. Deletion from Instapaper is not
+available. The URLs can be given explicitly, or by tag (as in "delete
+all URLs with this tag"). Select combinations of tags with the '+'
+symbol.
+
+.SH OPTIONS
+.PP
+\-h
+.RS 4
+Print a short usage message on
+.I stdout
+and exit with status zero.
+.RE
+.PP
+\-\-help
+.RS 4
+Print a lengthier usage message on
+.I stdout
+and exit with status zero.
+.RE
+.PP
+\-n, \-\-dry-run
+.RS 4
+Don't actually delete anything, just print what would be deleted.
+.PP
+
+.SH AUTHOR
+
+.B pin
+is written & maintained by Michael Herstine <sp1ff@pobox.com>. It
+is maintained at https://github.com/sp1ff/pin.
+
+.SH "SEE ALSO"
+
+.BR pin "(1), " pin-get-tags "(1), " pin-rename-tag "(1), " pin-send "(1)"

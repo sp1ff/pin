@@ -122,7 +122,7 @@ struct Entry {
 /// Each [`String`] in the input sequence will first be interpreted as an [`Url`] and, if that is
 /// succesful, the resulting [`Url`] will be yielded. If that fails, the input [`String`] will be
 /// interpreted as a [`Tag`] or [`Tag`]s which will in turn be mapped to a sequence of [`Url`]s.
-// TODO(sp1ff): If I remove this attribute, all hell breaks loose-- understand why.
+// LATER(sp1ff): If I remove this attribute, all hell breaks loose-- understand why.
 #[pin_project]
 pub struct GreedyUrlStream<I>
 where
@@ -225,6 +225,11 @@ fn parse_urls_from_chunk(buf: &mut Vec<u8>) -> Result<(Vec<u8>, VecDeque<Url>, u
     let mut urls = VecDeque::new();
     let mut bytes_to_consume = 0;
     loop {
+        // Special case: if the request returned _zero_ posts, the response body will be "[]".
+        // We've already popped the '[', so...
+        if buf.len() == 1 && buf[0] == b']' {
+            break;
+        }
         let mut deser = Deserializer::from_slice(&buf).into_iter::<Entry>();
         // `deser.next()` returns an Option<Result<Entry, serde_json::Error>>.
         // So: first-off: did we parse anything:

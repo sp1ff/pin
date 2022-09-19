@@ -1,0 +1,43 @@
+.\" Copyright (C) 2022 Michael Herstine <sp1ff@pobox.com>
+.\" You may distribute this file under the terms of the GNU Free
+.\" Documentation License.
+.TH pin-rename-tag 1 2022-09-02 "pin 0.2.0" "pin Manual"
+.SH NAME
+pin rename-tag \- Rename a Pinboard Tag
+.SH SYNOPSIS
+.BR "pin rename-tag " "[-h|--help] FROM TO"
+
+.SH DESCRIPTION
+
+Rename a Pinboard tag. Tags may be up to 255 grapheme clusters in
+length and may not contain commas nor whitespace. Tags may be
+designated as private by beginning them with a
+.I .
+character.
+
+.SH OPTIONS
+.PP
+\-h
+.RS 4
+Print a short usage message on
+.I stdout
+and exit with status zero.
+.RE
+.PP
+\-\-help
+.RS 4
+Print a lengthier usage message on
+.I stdout
+and exit with status zero.
+.RE
+.PP
+
+.SH AUTHOR
+
+.B pin
+is written & maintained by Michael Herstine <sp1ff@pobox.com>. It
+is maintained at https://github.com/sp1ff/pin.
+
+.SH "SEE ALSO"
+
+.BR pin "(1), " pin-get-tags "(1), " pin-delete "(1), " pin-send "(1)"

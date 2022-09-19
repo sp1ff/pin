@@ -1,3 +1,14 @@
+2022-09-18  Michael Herstine  <sp1ff@pobox.com>
+
+	First 0.2.0 commit
+
+2022-08-28  Michael Herstine  <sp1ff@pobox.com>
+
+	Implemented `rename-tag`.
+
+	This commit is a working Stream implementation that consumes an iterator of tags & URLs to be deleted and produces URLs, together with a non-trivial unit test suite.
+	The `delete` sub-command has been implemented, as well.
+
 2022-08-20  Michael Herstine  <sp1ff@pobox.com>
 
 	Initial 0.2 re-write.

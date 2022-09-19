@@ -1,0 +1,117 @@
+.\" Copyright (C) 2022 Michael Herstine <sp1ff@pobox.com>
+.\" You may distribute this file under the terms of the GNU Free
+.\" Documentation License.
+.TH pin 1 2022-09-02 "pin 0.2.0" "pin Manual"
+.SH NAME
+pin \- Manage your Pinboard links
+
+.SH SYNOPSIS
+.HP
+.B pin
+[-h|--help] [-V|--version]
+.RS 8
+.br
+[-c FILE]
+.br
+[-d|--debug] [-v|--verbose] [-q|--quiet]
+.br
+[<sub-command> <args>]
+.RE
+
+.B pin
+implements the following sub-commands:
+.IP
+.BR pin-delete (1)
+.RS 8
+.B pin delete
+will delete one or more links as specified either by URL or tag(s).
+.RE
+.IP
+.BR pin-get-tags (1)
+.RS 8
+.B pin get-tags
+will fetch all one's tags along with their use count & print them to
+.I stdout
+.RE
+.IP
+.BR pin-rename-tag (1)
+.RS 8
+.B pin rename-tag
+will rename a tag.
+.RE
+.IP
+.BR pin-send (1)
+.RS 8
+.B pin send
+will send one or more URLs to Pinboard. Each URL can be titled,
+tagged, marked as to be "read later" and/or also sent to Instapaper.
+.RE
+
+.SH DESCRIPTION
+.BR pin
+is a small utility for managing your Pinboard links. It is by no means
+complete; it supports a few operations which the author has found
+useful. The complete list of sub-commands may be found above. Each
+sub-command takes the `--help` option for details on its usage. HTML
+documentation for the Rust crate may be found at
+https://docs.rs/pin/latest/pin/. User documentation may be found at
+https://www.unwoundstack.com/doc/pin/curr. If you installed `pin` from
+the source distribution, you can also say `info pin` to read the
+documentation in your Info viewer.
+
+.SH OPTIONS
+.PP
+\-h
+.RS 4
+Print a short usage message on
+.I stdout
+& exit with status zero.
+.RE
+.PP
+\-\-help
+.RS 4
+Print a lengthier usage message on
+.I stdout
+& exit with status zero.
+.RE
+.PP
+\-V, \-\-version
+.RS 4
+Print the
+.B pin
+version on
+.I stdout
+and exit with status zero.
+.RE
+.PP
+\-c FILE
+.RS 4
+Specify an alternative location for the
+.B pin
+configuration file ($HOME/.pin is used by default).
+.RE
+.PP
+\-d, \-\-debug
+.RS 4
+Produce copious output intended for debugging.
+.RE
+.PP
+\-v, \-\-verbose
+.RS 4
+Produce more verbose output.
+.RE
+.PP
+\-q, \-\-quiet
+.RS 4
+Produce no output other than error messages.
+.RE
+
+.SH AUTHOR
+
+.B pin
+is written & maintained by Michael Herstine <sp1ff@pobox.com>. It
+is maintained at https://github.com/sp1ff/pin.
+
+.SH "SEE ALSO"
+
+.BR pin-delete "(1), " pin-get-tags "(1), " pin-rename-tag "(1), " pin-send "(1)"

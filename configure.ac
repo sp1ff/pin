@@ -14,7 +14,7 @@ AS_IF(test x$RUSTC = xno,
 )
 
 AC_CONFIG_FILES([pin/src/vars.rs])
-AC_CONFIG_FILES([Makefile pin/Makefile pin/Cargo.toml])
+AC_CONFIG_FILES([Makefile pin/Makefile pin/Cargo.toml doc/Makefile])
 
 dnl Specify --enable-debug to make a development release.  By default,
 dnl we build in public release mode.

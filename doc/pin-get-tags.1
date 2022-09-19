@@ -1,0 +1,66 @@
+.\" Copyright (C) 2022 Michael Herstine <sp1ff@pobox.com>
+.\" You may distribute this file under the terms of the GNU Free
+.\" Documentation License.
+.TH pin 1 2022-09-02 "pin 0.2.0" "pin Manual"
+.SH NAME
+pin get-tags \- Print all your Pinboard tags & their use counts.
+
+.SH SYNOPSIS
+.B "pin get-tags"
+[-h|--help]
+.RS 8
+.br
+[-a|--alphabetical]
+.br
+[-c|--csv]
+.br
+[-d|--descending]
+.RE
+
+.SH DESCRIPTION
+
+Generate a report on your tags & their usage. By default, print an
+Org-mode table to
+.I stdout
+listing tags by ascending use counts. The output may be changed to CSV
+format, the sort order and the sort key may be changed.
+
+.SH OPTIONS
+
+.PP
+\-h
+.RS 4
+Print a brief usage message on
+.I stdout
+& exit with status zero.
+.RE
+.PP
+\-\-help
+.RS 4
+Display more detailed help.
+.RE
+.PP
+\-a, \-\-alphabetical
+.RS 4
+Sort tags by tag name rather than use count.
+.RE
+.PP
+\-c, \-\-csv
+.RS 4
+Produce output in CSV format.
+.RE
+.PP
+.PP
+\-d, \-\-descending
+.RS 4
+Sort the output in descending order.
+.RE
+
+.SH AUTHOR
+.B pin
+is written & maintained by Michael Herstine <sp1ff@pobox.com>. It
+is maintained at https://github.com/sp1ff/pin.
+
+.SH "SEE ALSO"
+
+.BR pin "(1), " pin-delete "(1), " pin-rename-tag "(1), " pin-send "(1)"

@@ -45,7 +45,7 @@
 //! see [`send_links_with_backoff`].
 
 use reqwest::{IntoUrl, StatusCode, Url};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use snafu::{prelude::*, Backtrace};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -116,6 +116,7 @@ impl std::convert::From<Response> for Result<()> {
 pub struct Tag {
     // NB. We store the display form of the tag in `value`, so we need to maintain the internal
     // invariant that a private tag begins with a '.'
+    #[serde(deserialize_with = "deserialize_tag")]
     value: String,
 }
 
@@ -151,6 +152,15 @@ impl Tag {
         }
         Ok(())
     }
+}
+
+fn deserialize_tag<'de, D>(deserializer: D) -> StdResult<Tag, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use std::str::FromStr;
+    let buf = String::deserialize(deserializer)?;
+    Tag::from_str(&buf).map_err(serde::de::Error::custom)
 }
 
 impl std::convert::AsRef<str> for Tag {
@@ -283,6 +293,20 @@ mod entity_tests {
         assert!(x.is_err());
         let x = Tag::new("a b");
         assert!(x.is_err());
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct TagTest {
+        tag: Tag,
+    }
+
+    #[test]
+    fn test_serde() {
+        let trivial: TagTest = toml::from_str(r#"tag = "foo""#).unwrap();
+        assert_eq!("foo", trivial.tag.as_ref());
+
+        let bad: StdResult<TagTest, toml::de::Error> = toml::from_str(r#"tag = "foo bar""#);
+        assert!(bad.is_err());
     }
 }
 
