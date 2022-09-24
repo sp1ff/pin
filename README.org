@@ -2,10 +2,9 @@
 #+DESCRIPTION: A command-line Pinboard client
 #+AUTHOR: Michael Herstine
 #+EMAIL: <sp1ff@pobox.com>
-#+DATE: <2022-08-30 Tue 19:49>
+#+DATE: <2022-09-24 Sat 16:27>
 #+AUTODATE: t
 #+STARTUP: overview
-
 
 * Introduction
 
@@ -62,7 +61,6 @@ Type =pin --help= for a description of all flags & sub-commands.
 * License
 
 [[https://github.com/sp1ff/pin][pin]] is GPL v3 software.
-
 * Prerequistes
 
 The Rust [[https://rustup.rs/][toolchain]].
@@ -72,9 +70,9 @@ This crate is available on [[https://crates.io][crates.io]], but you can also do
 
 #+BEGIN_SRC bash
 cd /tmp
-curl -O https://www.unwoundstack.com/dist/pin-0.2.0.tar.xz
-tar xf pin-0.2.0.tar.xz
-cd pin-0.2.0
+curl -O https://www.unwoundstack.com/dist/pin-0.2.1.tar.xz
+tar xf pin-0.2.1.tar.xz
+cd pin-0.2.1
 ./configure
 make
 make check

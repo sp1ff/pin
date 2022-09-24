@@ -316,8 +316,6 @@ fn configure_tracing(matches: &ArgMatches) {
         simple_layer = Some(
             fmt::Layer::default()
                 .compact()
-                // TODO(sp1ff): pretty?
-                // .pretty()
                 .without_time()
                 .with_level(false)
                 .with_file(false)

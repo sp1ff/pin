@@ -72,7 +72,7 @@ use snafu::{IntoError, ResultExt, Snafu};
 use strfmt::strfmt;
 use tracing::{debug, trace};
 
-use std::{cmp::max, collections::HashMap, fmt::Debug, sync::atomic::Ordering};
+use std::{cmp::max, collections::HashMap, fmt::Debug, sync::atomic::Ordering, time::Duration};
 
 type StdResult<T, E> = std::result::Result<T, E>;
 
@@ -257,13 +257,18 @@ where
             }
         }
         if req.is_some() {
+            // Recall that `SystemTime` is *not* monotonic!
             let elapsed: u128 = SystemTime::now()
                 .duration_since(last_sent)
-                .unwrap()
+                .unwrap_or(Duration::ZERO)
                 .as_millis();
-            let elapsed: u64 = u64::try_from(elapsed).unwrap();
+            // `elapsed` *could* be greater than U64_MAX, but I wonder if we should just panic in
+            // that case...
+            let elapsed: u64 = u64::try_from(elapsed).unwrap_or(u64::MAX);
             trace!("elapsed is {}", elapsed);
-            let backoff = beta_ms.checked_sub(elapsed).unwrap();
+            // This could easily overflow, since `beta_ms` will defo be zero in some cases (i.e. no
+            // pause; just try as fast as possible).
+            let backoff = beta_ms.checked_sub(elapsed).unwrap_or(0);
             debug!("Sleeping for {}ms...", backoff);
             tokio::time::sleep(std::time::Duration::from_millis(backoff)).await;
             debug!("Sleeping for {}ms...done.", backoff);

@@ -1,8 +1,8 @@
-AC_INIT([pin], [0.2.0], [sp1ff@pobox.com], [pin], [https://github.com/sp1ff/pin])
+AC_INIT([pin], [0.2.1], [sp1ff@pobox.com], [pin], [https://github.com/sp1ff/pin])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_SRCDIR([pin/Cargo.toml.in])
 AC_CANONICAL_TARGET
-AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability -Wno-override gnits std-options dist-bzip2 dist-xz])
+AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability -Wno-override gnits std-options dist-xz dist-zstd])
 
 AC_CHECK_PROG(CARGO, [cargo], [yes], [no])
 AS_IF(test x$CARGO = xno,
@@ -20,8 +20,7 @@ dnl Specify --enable-debug to make a development release.  By default,
 dnl we build in public release mode.
 AC_ARG_ENABLE(
     debug,
-    AC_HELP_STRING([--enable-debug],
-                   [Build Rust code with debugging information [default=no]]),
+    AS_HELP_STRING([--enable-debug],[Build Rust code with debugging information [default=no]]),
     [rust_debug=$enableval],
     [rust_debug=no])
 
