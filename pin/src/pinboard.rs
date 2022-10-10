@@ -509,6 +509,7 @@ impl Client {
                 .query(&[
                     ("old", from.as_ref()),
                     ("new", to.as_ref()),
+                    ("auth_token", &self.token),
                     ("format", "json"),
                 ])
                 .send()

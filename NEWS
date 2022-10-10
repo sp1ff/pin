@@ -2,6 +2,9 @@ pin News -- history of user-visible changes           -*- outline -*-
 
 * 0.2 builds
 
+** 0.2.2
+
+Address issue #2 by including the `auth_token` query parameter in the request.
 ** 0.2.1
 
 Address issue #1 by handling failure in computing back-off.

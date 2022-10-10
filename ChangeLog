@@ -1,6 +1,11 @@
+2022-10-10  Michael Herstine  <sp1ff@pobox.com>
+
+	Fix issue #2.
+	`rename_tag` neglected to include the `auth_token` query parameter.
+
 2022-09-24  Michael Herstine  <sp1ff@pobox.com>
 
-	Address issue #1
+	Address issue #1 by handling backoff timing.
 
 2022-09-18  Michael Herstine  <sp1ff@pobox.com>
 
