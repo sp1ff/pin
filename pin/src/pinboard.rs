@@ -45,7 +45,7 @@
 //! see [`send_links_with_backoff`].
 
 use reqwest::{IntoUrl, StatusCode, Url};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use snafu::{prelude::*, Backtrace};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -152,15 +152,6 @@ impl Tag {
         }
         Ok(())
     }
-}
-
-fn deserialize_tag<'de, D>(deserializer: D) -> StdResult<Tag, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    use std::str::FromStr;
-    let buf = String::deserialize(deserializer)?;
-    Tag::from_str(&buf).map_err(serde::de::Error::custom)
 }
 
 impl std::convert::AsRef<str> for Tag {

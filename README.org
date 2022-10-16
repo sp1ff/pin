@@ -2,7 +2,7 @@
 #+DESCRIPTION: A command-line Pinboard client
 #+AUTHOR: Michael Herstine
 #+EMAIL: <sp1ff@pobox.com>
-#+DATE: <2022-10-10 Mon 16:52>
+#+DATE: <2022-10-15 Sat 17:34>
 #+AUTODATE: t
 #+STARTUP: overview
 
@@ -70,8 +70,8 @@ This crate is available on [[https://crates.io][crates.io]], but you can also do
 
 #+BEGIN_SRC bash
 cd /tmp
-curl -O https://www.unwoundstack.com/dist/pin-0.2.2.tar.xz
-tar xf pin-0.2.2.tar.xz
+curl -O https://www.unwoundstack.com/dist/pin-0.2.3.tar.xz
+tar xf pin-0.2.3.tar.xz
 cd pin-0.2.2
 ./configure
 make

@@ -501,7 +501,7 @@ async fn send_tags(sub: &ArgMatches, cfg: Config, client: Client) -> Result<()> 
         })
         .collect::<Result<Vec<PinboardPost>>>()?;
 
-    pin::make_requests_with_backoff(posts.into_iter(), 3000, 10000, 5)
+    pin::make_requests_with_backoff(posts.len(), posts.into_iter(), 3000, 10000, 5)
         .await
         .context(PinSnafu)
         .and_then(|_| Ok(()))

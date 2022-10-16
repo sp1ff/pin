@@ -12,10 +12,21 @@ cargo_verbose_1 = --verbose
 EXTRA_DIST = Cargo.lock
 bin_PROGRAMS = pin
 
-pin_SOURCES = Cargo.toml src/vars.rs src/main.rs src/lib.rs src/config.rs src/instapaper.rs src/pinboard.rs \
-	src/url-stream.rs
+DISTCLEANFILES = $(builddir)/Cargo.toml
 
-pin$(EXEEXT): $(pin_SOURCES)
+sources = main.rs       \
+	  lib.rs        \
+	  config.rs     \
+	  instapaper.rs \
+	  pinboard.rs   \
+	  url-stream.rs
+
+pin_SOURCES = $(srcdir)/Cargo.toml $(sources:%=src/%)
+
+dist-hook:
+	cp -v src/vars.rs $(distdir)/src/vars.rs
+
+pin$(EXEEXT): $(pin_SOURCES) $(srcdir)/Cargo.toml $(srcdir)/src/vars.rs
 	cd $(top_srcdir)/pin && \
 	CARGO_TARGET_DIR=@abs_top_builddir@/pin/target cargo build $(CARGO_VERBOSE) $(CARGO_RELEASE_ARGS)
 
@@ -26,7 +37,7 @@ clean-local:
 
 check-local:
 	cd $(top_srcdir)/pin && \
-	CARGO_TARGET_DIR=@abs_top_builddir@/pin/target cargo test
+	CARGO_TARGET_DIR=@abs_top_builddir@/pin/target cargo test $(CARGO_VERBOSE) $(CARGO_RELEASE_ARGS) $(CARGO_FEATURE_ARGS)
 
 install-exec-local: pin$(EXEEXT)
 	install -d $(DESTDIR)$(bindir)

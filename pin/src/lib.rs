@@ -68,6 +68,7 @@ pub mod url_stream;
 pub mod vars;
 
 use async_trait::async_trait;
+use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use snafu::{IntoError, ResultExt, Snafu};
 use strfmt::strfmt;
 use tracing::{debug, trace};
@@ -223,7 +224,8 @@ pub async fn get_tags<W: std::io::Write + std::fmt::Debug>(
 /// implementation works in tems of the [`Sender`] trait.
 #[tracing::instrument]
 pub async fn make_requests_with_backoff<I, T>(
-    mut reqs: I,
+    len: usize,
+    reqs: I,
     mut beta_ms: u64,
     max_beta_ms: u64,
     max_retries: usize,
@@ -233,6 +235,11 @@ where
     T: Sender + Debug,
 {
     use std::time::SystemTime;
+
+    let mut reqs = reqs.progress_with(
+        ProgressBar::new(len.try_into().unwrap())
+            .with_style(ProgressStyle::default_bar().progress_chars(".| ")),
+    );
 
     let mut retries = 0;
     let mut req = reqs.next();
@@ -352,6 +359,7 @@ impl<'a, 'b> Sender for PinboardPost<'a, 'b> {
             Ok(_) => {
                 if let Some((insty_post, beta, max_beta, max_retries)) = &self.insty {
                     let new_beta = make_requests_with_backoff(
+                        1,
                         std::iter::once(insty_post),
                         beta.load(Ordering::Relaxed),
                         *max_beta,
@@ -395,6 +403,7 @@ impl<'a, 'b> PinboardPost<'a, 'b> {
         }
     }
 }
+
 #[cfg(test)]
 mod test {
 
@@ -546,6 +555,7 @@ mod test {
         let atom = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(1000));
 
         make_requests_with_backoff(
+            2,
             vec![
                 PinboardPost::new(
                     &pin_client,
@@ -609,5 +619,22 @@ mod test {
         assert!(deltas[3].as_millis() <= 10);
         assert!(deltas[4].as_millis().checked_sub(1000).unwrap() <= 10);
         assert!(deltas[5].as_millis().checked_sub(2000).unwrap() <= 10);
+    }
+}
+
+#[cfg(test)]
+mod proto {
+
+    use super::*;
+
+    #[test]
+    fn smoke() {
+        let x = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        for _ in x.iter().progress_with(
+            ProgressBar::new(x.len().try_into().unwrap())
+                .with_style(ProgressStyle::default_bar().progress_chars(".| ")),
+        ) {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
     }
 }

@@ -682,11 +682,11 @@ mod test {
 }
 
 #[cfg(test)]
+#[cfg(feature = "personal-link-tests")]
 mod link_tests {
 
     use super::*;
 
-    use test_log::test;
     use tracing::{debug, error};
 
     use std::path::Path;
@@ -770,8 +770,7 @@ mod link_tests {
         base_url
     }
 
-    #[cfg(feature = "personal-link-tests")]
-    #[test(tokio::test)]
+    #[tokio::test]
     async fn linkedin_and_jira() {
         let url = test_server(&Path::new("linkedin-and-jira.json"), 4096).await;
         let client = pinboard::Client::new(url, "sp1ff:FFFFFFFFFFFFFFFFFFFF").unwrap();
@@ -781,8 +780,7 @@ mod link_tests {
         assert_eq!(stream.count().await, 4);
     }
 
-    #[cfg(feature = "personal-link-tests")]
-    #[test(tokio::test)]
+    #[tokio::test]
     async fn linkedin() {
         let url = test_server(&Path::new("linkedin.json"), 4096).await;
         let client = pinboard::Client::new(url, "sp1ff:FFFFFFFFFFFFFFFFFFFF").unwrap();
