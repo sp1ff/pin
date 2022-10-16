@@ -614,32 +614,32 @@ mod test {
         debug!("deltas[5]: {}", deltas[5].as_millis());
         assert_eq!(6, deltas.len());
         assert!(
-            deltas[0].as_millis().checked_sub(6000).unwrap() <= 10,
+            deltas[0].as_millis().checked_sub(6000).unwrap() <= 100,
             "deltas[0] := {}",
             deltas[0].as_millis()
         );
         assert!(
-            deltas[1].as_millis() <= 10,
+            deltas[1].as_millis() <= 100,
             "deltas[1] := {}",
             deltas[1].as_millis()
         );
         assert!(
-            deltas[2].as_millis().checked_sub(2990).unwrap() <= 20,
+            deltas[2].as_millis().checked_sub(2990).unwrap() <= 110,
             "deltas[2] := {}",
             deltas[2].as_millis()
         );
         assert!(
-            deltas[3].as_millis() <= 10,
+            deltas[3].as_millis() <= 100,
             "deltas[3] := {}",
             deltas[3].as_millis()
         );
         assert!(
-            deltas[4].as_millis().checked_sub(1000).unwrap() <= 10,
+            deltas[4].as_millis().checked_sub(1000).unwrap() <= 100,
             "deltas[4] := {}",
             deltas[4].as_millis()
         );
         assert!(
-            deltas[5].as_millis().checked_sub(2000).unwrap() <= 10,
+            deltas[5].as_millis().checked_sub(2000).unwrap() <= 100,
             "deltas[5] := {}",
             deltas[5].as_millis()
         );
