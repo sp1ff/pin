@@ -1,6 +1,10 @@
-2022-10-15  Michael Herstine  <sp1ff@pobox.com>
+2022-10-16  Michael Herstine  <sp1ff@pobox.com>
 
-	Added progress bars to anything that goes through
+	Setting-up my CI workflow
+	  - establish rust 1.57 as minimum
+	  - loosen tolerances for MacOS
+
+	Added progress bars to anything that goes through `make_requests_with_backoff`.
 
 2022-10-10  Michael Herstine  <sp1ff@pobox.com>
 

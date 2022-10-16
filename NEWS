@@ -2,6 +2,9 @@ pin News -- history of user-visible changes           -*- outline -*-
 
 * 0.2 builds
 
+** 0.2.4
+
+No user-visible changes.
 ** 0.2.3
 
 Added progress bars to `send` & `delete`.
