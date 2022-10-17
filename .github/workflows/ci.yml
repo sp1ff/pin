@@ -21,7 +21,7 @@ jobs:
         include:
         - rust-build: pinned
           os: ubuntu-22.04
-          rust: 1.47.0
+          rust: 1.57
         - rust-build: stable
           os: ubuntu-22.04
           rust: stable
@@ -30,7 +30,7 @@ jobs:
           rust: nightly
         - rust-build: pinned
           os: macos-10.15
-          rust: 1.47.0
+          rust: 1.57
         - rust-build: stable
           os: macos-10.15
           rust: stable
@@ -51,7 +51,7 @@ jobs:
           pwd
           set -x
           sudo apt-get update
-          sudo apt-get install -y autoconf automake emacs liblzma-dev
+          sudo apt-get install -y autoconf automake emacs liblzma-dev texlive
 
     - name: Install Tools (macOS)
       if: matrix.os == 'macos-10.15'
@@ -62,6 +62,7 @@ jobs:
           brew update
           brew upgrade
           brew install autoconf automake emacs
+          brew install --cask basictex
 
     - name: Install Rust
       uses: actions-rs/toolchain@v1

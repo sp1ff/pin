@@ -23,6 +23,14 @@ sources = main.rs       \
 
 pin_SOURCES = $(srcdir)/Cargo.toml $(sources:%=src/%)
 
+# If the source tree is writable, copy Cargo.toml back into it, so that cargo will work
+$(srcdir)/Cargo.toml: $(builddir)/Cargo.toml
+	if test -w $(srcdir); then cp -v $(builddir)/Cargo.toml $(srcdir); fi
+
+# If the source tree is writable, vars.rs back into it, so that cargo will work
+$(srcdir)/src/vars.rs: $(builddir)/src/vars.rs
+	if test -w $(srcdir); then cp -v $(builddir)/src/vars.rs $(srcdir)/src; fi
+
 dist-hook:
 	cp -v src/vars.rs $(distdir)/src/vars.rs
 
