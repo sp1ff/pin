@@ -1,8 +1,19 @@
 2022-10-16  Michael Herstine  <sp1ff@pobox.com>
 
+	Bumping version for tagging purposes
+
+	Normalizing the release workflow; from now on, it will only make a release when pushing a tag.
+
+	Adding a release workflow
+
+	Merge branch 'workflows'
+
 	Setting-up my CI workflow
 	  - establish rust 1.57 as minimum
 	  - loosen tolerances for MacOS
+	  - adjust pin/Makefile.am to support VPATH builds
+
+	Setting-up my CI workflow
 
 	Added progress bars to anything that goes through `make_requests_with_backoff`.
 
