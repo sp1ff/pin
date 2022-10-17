@@ -11,7 +11,7 @@ repository = "https://github.com/sp1ff/pin"
 readme = "README.md"
 keywords = ["cli", "pinboard", "utility", "bookmarks"]
 categories = ["command-line-utilities"]
-exclude = ["*~", "Cargo.toml.in", "Cargo.toml.orig", "rusty-tags.emacs", "Makefile.am", "Makefile.in", "Makefile", "vars.rs.in"]
+exclude = ["*~", "Cargo.toml.in", "Cargo.toml.orig", "rusty-tags.emacs", "Makefile.am", "Makefile.in", "Makefile", "vars.rs.in", "linkedin.json", "linkedin-and-jira.json"]
 
 [features]
 personal-link-tests = []
