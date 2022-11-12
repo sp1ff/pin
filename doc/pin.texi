@@ -172,6 +172,7 @@ pin send "http://foo.com | foo"
 
 The latter form happens to be the export format of the One Tab FireFox
 plugin.
+@cindex One Tab
 
 You can tag the links given as arguments as ``to be read later'' by
 adding the @option{--read-later}. You can tags the links given with
@@ -182,6 +183,7 @@ once).
 @menu
 * Instapaper::
 * Targets::
+* Reading URLs From File::
 @end menu
 
 @node Instapaper
@@ -241,6 +243,25 @@ say:
 @example
 pin send --target=long-form "https://foo.com | Think Piece"
 @end example
+
+@node Reading URLs From File
+@subsection Reading URLs From File
+@cindex Reading URLs from file
+
+It is sometimes convenient to send a collection of URLs to Pinboard
+from file. For instance, the One Tab Firefox plugin allows the user to
+export saved links to a plain text file in the format ``URL |
+Title''. One can invoke pin on the contents of that file in one fell
+swoop like so:
+
+@example
+cat links.txt|tr '\n' '\0'|xargs -0 pin send -I -r my-target
+@end example
+
+The input file may contain blank lines. In that case, it is convenient
+to supply the @command{-I} option (or @command{--ignore-blank}); in
+this case @command{pin} will simply ignore empty arguments, rather
+than producing an error message & halting.
 
 @node Deleting Links
 @section Deleting Links

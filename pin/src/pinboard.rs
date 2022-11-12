@@ -72,9 +72,10 @@ pub enum Error {
     InvalidTag { text: String, backtrace: Backtrace },
     #[snafu(display("\"{text}\" is not a valid title"))]
     InvalidTitle { text: String, backtrace: Backtrace },
-    #[snafu(display("Pinboard API error: {status}"))]
+    #[snafu(display("Pinboard API error: {status} ({text:?})"))]
     Pinboard {
         status: reqwest::StatusCode,
+        text: Option<String>,
         backtrace: Backtrace,
     },
     #[snafu(display("Rate limit hit"))]
@@ -85,15 +86,20 @@ pub type Result<T> = StdResult<T, Error>;
 
 struct Response(reqwest::Response);
 
-impl std::convert::From<Response> for Result<()> {
-    fn from(rsp: Response) -> Self {
-        let status = rsp.0.status();
+// Would have been nice to use `From`, but it's not async (which we need to get the body)
+impl Response {
+    async fn into_result(self) -> Result<()> {
+        let status = self.0.status();
         if status.is_success() {
             return Ok(());
         } else if status == StatusCode::TOO_MANY_REQUESTS {
             return Err(Error::RateLimit);
         } else {
-            return PinboardSnafu { status: status }.fail();
+            return PinboardSnafu {
+                status: status,
+                text: self.0.text().await.ok(),
+            }
+            .fail();
         }
     }
 }
@@ -396,6 +402,7 @@ impl Client {
             eprintln!("{:#?}", rsp);
             return PinboardSnafu {
                 status: rsp.status(),
+                text: rsp.text().await.ok(),
             }
             .fail();
         }
@@ -438,9 +445,10 @@ impl Client {
                 ])
                 .send()
                 .await
-                .context(HttpSnafu {})?,
+                .context(HttpSnafu)?,
         )
-        .into()
+        .into_result()
+        .await
     }
     /// Retrieve all posts; filter by zero or more tags. The docs say up to three tags are supported,
     /// but this implementation doesn't enforce that.
@@ -486,7 +494,8 @@ impl Client {
                 .await
                 .context(HttpSnafu)?,
         )
-        .into()
+        .into_result()
+        .await
     }
     #[tracing::instrument]
     pub async fn rename_tag(&self, from: &Tag, to: &Tag) -> Result<()> {
@@ -507,7 +516,8 @@ impl Client {
                 .await
                 .context(HttpSnafu)?,
         )
-        .into()
+        .into_result()
+        .await
     }
 }
 

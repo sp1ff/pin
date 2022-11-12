@@ -87,7 +87,7 @@ enum Error {
     #[snafu(display("Instapaper API error {source}"))]
     Instapaper { source: pin::instapaper::Error },
     #[snafu(display(
-        "The link {link} contained no title, and you did not specify one with --title."
+        "The link '{link}' contained no title, and you did not specify one with --title."
     ))]
     MissingTitle { link: String, backtrace: Backtrace },
     #[snafu(display("Unkown sub-command."))]
@@ -168,12 +168,30 @@ fn add_send(app: App<'_>) -> App<'_> {
             .about("Send an URL to Pinboard (and optionally to Instapaper)")
             .long_about("Send one or more URLs to Pinboard as well as, optionally, Intapaper.")
             .arg(
-                Arg::new("target")
-                    .short('r')
-                    .long("target")
-                    .help("pre-configured target for this link")
-                    .long_help("Since one will likely re-use many of these options across invocations of this tool, it may be convenient to define them once in the configuration file & afterwards refer to that collection by name; we call such a pre-defined collection a \"target\". ")
+                Arg::new("ignore-blank")
+                    .long("ignore-blank")
+                    .short('I')
+                    .help("Ignore blank URLs")
+                    .long_help("Ignore blank URLs; this can be handy when piping multiple URLs from a text file that may inadvertently contain blank lines (e.g. `cat links.txt|tr '\n' '\0'|xargs -0 pin send -r my-target`).")
+                )
+            .arg(
+                Arg::new("instapaper")
+                    .long("with-instapaper")
+                    .short('i')
+                    .help("Send this link to Instapaper as well"),
+            )
+            .arg(
+                Arg::new("password")
+                    .long("password")
+                    .short('p')
+                    .help("Your Instapaper password")
                     .takes_value(true),
+            )
+            .arg(
+                Arg::new("read-later")
+                    .short('R')
+                    .long("read-later")
+                    .help("mark this pin as `read later'"),
             )
             .arg(
                 Arg::new("tag")
@@ -186,10 +204,12 @@ fn add_send(app: App<'_>) -> App<'_> {
                     .number_of_values(1), // "-t a -t b...", not "-t a b..."
             )
             .arg(
-                Arg::new("read-later")
-                    .short('R')
-                    .long("read-later")
-                    .help("mark this pin as `read later'"),
+                Arg::new("target")
+                    .short('r')
+                    .long("target")
+                    .help("pre-configured target for this link")
+                    .long_help("Since one will likely re-use many of these options across invocations of this tool, it may be convenient to define them once in the configuration file & afterwards refer to that collection by name; we call such a pre-defined collection a \"target\". ")
+                    .takes_value(true)
             )
             .arg(
                 Arg::new("title")
@@ -200,20 +220,6 @@ fn add_send(app: App<'_>) -> App<'_> {
                     .takes_value(true),
             )
             .arg(
-                Arg::new("url")
-                    .index(1)
-                    .help("URL to be sent to pinboard.in")
-                    .long_help("You may specify one or more URLs to be sent to Pinboard. The argument may be given in one of two ways. The first is simply the URL, in which case the title will be taken from the -T option (which must be provided, in this case; it is illegal to send a link with no title). The other is to give an argument of the form \"URL | TITLE\" in which case the TITLE given in this argument will be preferred to the -T option.")
-                    .multiple_values(true)
-                    .required(true),
-            )
-            .arg(
-                Arg::new("instapaper")
-                    .long("with-instapaper")
-                    .short('i')
-                    .help("Send this link to Instapaper as well"),
-            )
-            .arg(
                 Arg::new("username")
                     .long("username")
                     .short('u')
@@ -221,12 +227,13 @@ fn add_send(app: App<'_>) -> App<'_> {
                     .takes_value(true),
             )
             .arg(
-                Arg::new("password")
-                    .long("password")
-                    .short('p')
-                    .help("Your Instapaper password")
-                    .takes_value(true),
-            ),
+                Arg::new("url")
+                    .index(1)
+                    .help("URL to be sent to pinboard.in")
+                    .long_help("You may specify one or more URLs to be sent to Pinboard. The argument may be given in one of two ways. The first is simply the URL, in which case the title will be taken from the -T option (which must be provided, in this case; it is illegal to send a link with no title). The other is to give an argument of the form \"URL | TITLE\" in which case the TITLE given in this argument will be preferred to the -T option.")
+                    .multiple_values(true)
+                    .required(true),
+            )
     )
 }
 
@@ -457,6 +464,14 @@ async fn send_tags(sub: &ArgMatches, cfg: Config, client: Client) -> Result<()> 
     let posts = sub
         .get_many::<String>("url")
         .unwrap() // This option is required
+        // Ignore blank lines, if requested
+        .filter(|arg| {
+            if sub.is_present("ignore-blank") {
+                arg.trim().len() != 0
+            } else {
+                true
+            }
+        })
         .map(|arg| -> Result<PinboardPost> {
             // We need an iterator yielding Posts. Let's figure out the link & the title:
             let split: (&str, &str) = arg
@@ -627,5 +642,67 @@ async fn main() -> Result<()> {
         client.rename_tag(&from, &to).await.context(PinboardSnafu)
     } else {
         Err(Error::NoSubCommand)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                  yes! We can unit test main!                                   //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use mockito::{mock, Matcher};
+
+    #[tokio::test]
+    async fn test_ignore_blanks() {
+        // I want to test a few things:
+        //
+        // 1. if we pass a blank string for the positional argument, we get the improved error
+        // message
+        let mut dot_pin = home::home_dir();
+        let mut app = make_app(dot_pin.as_mut());
+        app = add_send(app);
+
+        let cfg = Config::default();
+        let client = Client::new(&mockito::server_url(), "sp1ff:baadf00d").unwrap();
+
+        let matches = app.get_matches_from(vec!["pin", "-t", "sp1ff:baadf00d", "send", ""]);
+        let sub_matches = matches.subcommand_matches("send").unwrap();
+        assert_eq!(
+            format!(
+                "{}",
+                send_tags(&sub_matches, cfg.clone(), client.clone(),)
+                    .await
+                    .unwrap_err()
+            ),
+            "The link '' contained no title, and you did not specify one with --title."
+        );
+
+        // 2. if we pass blank strings intermingled with blank lines _and_ the -I flag, we get the
+        // appropriate number of calls to the `add` endpoint and no errors
+        let mock = mock("GET", Matcher::Regex(r"^/v1/posts/add.*".to_string()))
+            .with_status(201)
+            .expect(2)
+            .create();
+
+        let mut app = make_app(dot_pin.as_mut());
+        app = add_send(app);
+        let matches = app.get_matches_from(vec![
+            "pin",
+            "-t",
+            "sp1ff:baadf00d",
+            "send",
+            "-I",
+            "https://foo.com | foo",
+            "",
+            "https://bar.com | bar",
+        ]);
+        let sub_matches = matches.subcommand_matches("send").unwrap();
+        send_tags(&sub_matches, cfg.clone(), client.clone())
+            .await
+            .unwrap();
+        mock.assert();
     }
 }

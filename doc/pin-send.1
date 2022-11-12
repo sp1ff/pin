@@ -1,7 +1,7 @@
 .\" Copyright (C) 2022 Michael Herstine <sp1ff@pobox.com>
 .\" You may distribute this file under the terms of the GNU Free
 .\" Documentation License.
-.TH pin 1 2022-10-16 "pin 0.2.5" "pin Manual"
+.TH pin 1 2022-11-11 "pin 0.2.6" "pin Manual"
 .SH NAME
 pin send \- Send one ore more URLs to Pinboard as well as, optionally,
 Instapaper.
@@ -12,6 +12,8 @@ Instapaper.
 .RS 8
 .br
 [-i, --with-instapaper] [-p PASSWD|--password=PASSWD] [-u USER|--user=USER]
+.br
+[-I, --ignore-blank]
 .br
 [-t TARGET|--target=TARGET]
 .br
@@ -66,6 +68,13 @@ in your configuration file, as well as in the environment variable
 Instapaper password. You can also specify your Instapaper password
 in your configuration file, as well as in the environment variable
 .I INSTAPAPER_PASSWORD
+.RE
+.PP
+[-I|--ignore-blank]
+.RS 4
+Ignore blank URLs; this can be handy when piping multiple URLs from a
+text file that may inadvertently contain blank lines (e.g. `cat
+links.txt|tr '\n' '\0'|xargs -0 pin send -r my-target`).
 .RE
 .PP
 [-r TARGET|--target=TARGET]

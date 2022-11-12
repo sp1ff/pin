@@ -2,6 +2,9 @@ pin News -- history of user-visible changes           -*- outline -*-
 
 * 0.2 builds
 
+** 0.2.6
+
+-I (--ignore-blank) option added to the `send` operation.
 ** 0.2.5
 
 No user-visible changes.
