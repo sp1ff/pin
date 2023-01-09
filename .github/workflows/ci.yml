@@ -2,12 +2,15 @@
 # BurntShushi from whom I shamelessly copied a lot of this
 # <https://github.com/BurntSushi/ripgrep/blob/master/.github/workflows/ci.yml>
 name: ci
+
 on:
   workflow_dispatch:
   pull_request:
+    types: [opened, edited, reopened] # don't say `synchronize`-- that is taken care of by `push`
   push:
   schedule:
     - cron: '00 01 * * *'
+
 jobs:
   build:
     name: build
@@ -17,7 +20,7 @@ jobs:
           - pinned
           - stable
           - nightly
-        os: [ubuntu-22.04, macos-10.15]
+        os: [ubuntu-22.04, macos-12]
         include:
         - rust-build: pinned
           os: ubuntu-22.04
@@ -29,13 +32,13 @@ jobs:
           os: ubuntu-22.04
           rust: nightly
         - rust-build: pinned
-          os: macos-10.15
+          os: macos-12
           rust: 1.57
         - rust-build: stable
-          os: macos-10.15
+          os: macos-12
           rust: stable
         - rust-build: nightly
-          os: macos-10.15
+          os: macos-12
           rust: nightly
     runs-on: ${{ matrix.os }}
     env:
@@ -54,15 +57,37 @@ jobs:
           sudo apt-get install -y autoconf automake emacs liblzma-dev texlive
 
     - name: Install Tools (macOS)
-      if: matrix.os == 'macos-10.15'
+      if: matrix.os == 'macos-12'
       shell: bash
       run: |
           pwd
           set -x
+          # Failure to do so causes `brew update` to fail
+          rm '/usr/local/bin/2to3-3.11'
+          rm '/usr/local/bin/2to3'
+          rm '/usr/local/bin/idle3.11'
+          rm '/usr/local/bin/idle3'
           brew update
-          brew upgrade
-          brew install autoconf automake emacs
+          # brew upgrade <==: fails on Virtual Box(?)
+          brew install autoconf automake emacs make
           brew install --cask basictex
+          eval "$(/usr/libexec/path_helper)"
+
+    - name: Install a modern version of Texinfo
+      if: matrix.os == 'macos-12'
+      shell: bash
+      run: |
+          set -x
+          mkdir tmp && cd tmp
+          # TODO: cache this
+          curl -L -O https://ftp.gnu.org/gnu/texinfo/texinfo-7.0.2.tar.gz
+          tar xf texinfo-7.0.2.tar.gz
+          cd texinfo-7.0.2
+          ./configure
+          make
+          make install
+          type -p texi2dvi
+          texi2dvi --version
 
     - name: Install Rust
       uses: actions-rs/toolchain@v1
@@ -110,8 +135,12 @@ jobs:
       run: make distcheck
 
     - name: Check the Autotools distribution (MacOS)
-      if: matrix.os == 'macos-10.15'
+      if: matrix.os == 'macos-12'
       shell: bash
       run: |
+        set -x
         eval "$(/usr/libexec/path_helper)"
+        # Cf. <https://answers.launchpad.net/gcc-arm-embedded/+question/681980>
+        texi2dvi --version
+        texi2dvi --help
         make distcheck
