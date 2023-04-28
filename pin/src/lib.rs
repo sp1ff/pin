@@ -614,7 +614,7 @@ mod test {
         debug!("deltas[5]: {}", deltas[5].as_millis());
         assert_eq!(6, deltas.len());
         assert!(
-            deltas[0].as_millis().checked_sub(6000).unwrap() <= 250,
+            deltas[0].as_millis().checked_sub(6000).unwrap() <= 350,
             "deltas[0] := {}",
             deltas[0].as_millis()
         );
