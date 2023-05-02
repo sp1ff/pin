@@ -606,12 +606,12 @@ mod test {
             deltas = mock.lock().unwrap().deltas();
         }
 
-        debug!("deltas[0]: {}", deltas[0].as_millis());
-        debug!("deltas[1]: {}", deltas[1].as_millis());
-        debug!("deltas[2]: {}", deltas[2].as_millis());
-        debug!("deltas[3]: {}", deltas[3].as_millis());
-        debug!("deltas[4]: {}", deltas[4].as_millis());
-        debug!("deltas[5]: {}", deltas[5].as_millis());
+        eprintln!("deltas[0]: {}", deltas[0].as_millis());
+        eprintln!("deltas[1]: {}", deltas[1].as_millis());
+        eprintln!("deltas[2]: {}", deltas[2].as_millis());
+        eprintln!("deltas[3]: {}", deltas[3].as_millis());
+        eprintln!("deltas[4]: {}", deltas[4].as_millis());
+        eprintln!("deltas[5]: {}", deltas[5].as_millis());
         assert_eq!(6, deltas.len());
         assert!(
             deltas[0].as_millis().checked_sub(6000).unwrap() <= 350,
