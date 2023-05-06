@@ -1,43 +1,31 @@
+2023-05-06  Michael Herstine  <sp1ff@pobox.com>
+
+	Make `pin` 0.2.8:
+	    - hopefully, fix the intermittent failures in the unit tests
+	      in which the system clock appeared to go backward
+	    - apply a `cargo update`
+
+2023-05-02  Michael Herstine  <sp1ff@pobox.com>
+
+	Adding printf-style debug statements to try to trouble-shoot intermittent  failures
+
+2023-04-27  Michael Herstine  <sp1ff@pobox.com>
+
+	Loosen the timing tolerances in the unit tests to accomodate the execrable performance of the cloud.
+
 2023-04-20  Michael Herstine  <sp1ff@pobox.com>
+
+	Updating my "pinned" version of rustc to 1.65
+
+2023-04-20  Michael Herstine  <michael@lithic>
 
 	Maintenance commit:
 	    - fix the C/I workflow
+	      - update the matrix to `macos-12`
+	      - use `/usr/libexec/path_helper` to avoid Xcode tools
+	      - install a modern version of Texinfo on MacOS
 	    - update copyrights
 	    - update dependencies
-
-	Trying to get distcheck to pass on MacOS-- texi2dvi is too old; installing a modern version of Texinfo
-
-	Trying to get distcheck to pass on MacOS-- texi2dvi is too old; installing a modern version of Texinfo
-
-	Trying to get distcheck to pass on MacOS-- texi2dvi is too old; installing a modern version of Texinfo
-
-	Trying to get distcheck to pass on MacOS-- texi2dvi is too old
-
-2023-02-20  Michael Herstine  <sp1ff@pobox.com>
-
-	trying to get distcheck to pass on MacOS-- it's picking-up the XCode toolchain
-
-	trying to get distcheck to pass on MacOS-- it's picking-up the XCode toolchain
-
-	trying to get distcheck to pass on MacOS-- it's picking-up the XCode toolchain
-
-	Forgot to update to macos-11 throughout
-
-	Reverted actions-rs/toolchain to v1-- there is no v2
-
-	Updated actions-rs/toolchain to v2
-
-	Updating to macos-12
-
-2023-01-08  Michael Herstine  <michael@lithic>
-
-	Removing a few more Python links before updating
-
-	Removing a few Python links before updating
-
-	Unlinking python@3.11 before updating
-
-	Update the CI workflow to MacOS 11
 
 2022-11-11  Michael Herstine  <michael@lithic>
 

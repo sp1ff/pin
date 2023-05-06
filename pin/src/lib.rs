@@ -606,43 +606,29 @@ mod test {
             deltas = mock.lock().unwrap().deltas();
         }
 
+        // TODO(sp1ff): to be removed, once this is consistently passing under Githhub Actions
         eprintln!("deltas[0]: {}", deltas[0].as_millis());
         eprintln!("deltas[1]: {}", deltas[1].as_millis());
         eprintln!("deltas[2]: {}", deltas[2].as_millis());
         eprintln!("deltas[3]: {}", deltas[3].as_millis());
         eprintln!("deltas[4]: {}", deltas[4].as_millis());
         eprintln!("deltas[5]: {}", deltas[5].as_millis());
+
+        fn abs_diff_millis(lhs: Duration, rhs: Duration) -> u128 {
+            if lhs <= rhs {
+                rhs.checked_sub(lhs).unwrap_or(Duration::MAX).as_millis()
+            } else {
+                lhs.checked_sub(rhs).unwrap_or(Duration::MAX).as_millis()
+            }
+        }
+
         assert_eq!(6, deltas.len());
-        assert!(
-            deltas[0].as_millis().checked_sub(6000).unwrap() <= 350,
-            "deltas[0] := {}",
-            deltas[0].as_millis()
-        );
-        assert!(
-            deltas[1].as_millis() <= 250,
-            "deltas[1] := {}",
-            deltas[1].as_millis()
-        );
-        assert!(
-            deltas[2].as_millis().checked_sub(2900).unwrap() <= 350,
-            "deltas[2] := {}",
-            deltas[2].as_millis()
-        );
-        assert!(
-            deltas[3].as_millis() <= 250,
-            "deltas[3] := {}",
-            deltas[3].as_millis()
-        );
-        assert!(
-            deltas[4].as_millis().checked_sub(1000).unwrap() <= 250,
-            "deltas[4] := {}",
-            deltas[4].as_millis()
-        );
-        assert!(
-            deltas[5].as_millis().checked_sub(2000).unwrap() <= 250,
-            "deltas[5] := {}",
-            deltas[5].as_millis()
-        );
+        assert!(abs_diff_millis(deltas[0], Duration::from_millis(6000)) <= 250);
+        assert!(deltas[1].as_millis() <= 250);
+        assert!(abs_diff_millis(deltas[2], Duration::from_millis(3000)) <= 250);
+        assert!(deltas[3].as_millis() <= 250);
+        assert!(abs_diff_millis(deltas[4], Duration::from_millis(1000)) <= 250);
+        assert!(abs_diff_millis(deltas[5], Duration::from_millis(2000)) <= 250);
     }
 }
 
