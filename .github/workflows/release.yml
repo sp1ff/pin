@@ -11,8 +11,8 @@ on:
   # release-infra *or* it has a tag of n.n.n)
   push:
     # Un-comment this for testing
-    # branches:
-    #   - release-infra
+    branches:
+      - release-infra-05-2023
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
 
@@ -87,7 +87,7 @@ jobs:
           sudo apt-get install -y autoconf automake emacs liblzma-dev texlive
 
     - name: Install Tools (macOS)
-      if: matrix.os == 'macos-10.15'
+      if: matrix.os == 'macos-12'
       shell: bash
       run: |
           set -x
