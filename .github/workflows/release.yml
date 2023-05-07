@@ -1,7 +1,7 @@
 # Setting up a release workflow for `pin`. Many thanks to
 # BurntShushi from whom I shamelessly copied a lot of this
 # <https://github.com/BurntSushi/ripgrep/blob/master/.github/workflows/release.yml>
-name: release
+name: Make Release
 on:
   # This permits this workflow to be triggered manually. See the
   # environment variable RELEASE_VERSION below, however.
@@ -22,8 +22,8 @@ jobs:
     name: create-release
     runs-on: ubuntu-latest
     # Un-comment this for testing
-    # env:
-    #   RELEASE_VERSION: 0.2.4
+    env:
+      RELEASE_VERSION: 0.2.8
     steps:
       - name: Create artifacts directory
         run: mkdir artifacts
