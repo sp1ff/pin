@@ -11,8 +11,8 @@ on:
   # release-infra *or* it has a tag of n.n.n)
   push:
     # Un-comment this for testing
-    branches:
-      - release-infra-05-2023
+    # branches:
+    #   - release-infra-05-2023
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
 
@@ -22,8 +22,8 @@ jobs:
     name: create-release
     runs-on: ubuntu-latest
     # Un-comment this for testing
-    env:
-      RELEASE_VERSION: 0.2.8
+    # env:
+    #   RELEASE_VERSION: 0.2.8
     steps:
       - name: Create artifacts directory
         run: mkdir artifacts
