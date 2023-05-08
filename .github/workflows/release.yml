@@ -92,10 +92,27 @@ jobs:
       run: |
           set -x
           pwd
-          brew update
+          # brew upgrade <==: fails on Virtual Box(?)
           brew upgrade
           brew install autoconf automake emacs
           brew install --cask basictex
+          eval "$(/usr/libexec/path_helper)"
+
+    - name: Install a modern version of Texinfo
+      if: matrix.os == 'macos-12'
+      shell: bash
+      run: |
+          set -x
+          mkdir tmp && cd tmp
+          # TODO(sp1ff): cache this
+          curl -L -O https://ftp.gnu.org/gnu/texinfo/texinfo-7.0.2.tar.gz
+          tar xf texinfo-7.0.2.tar.gz
+          cd texinfo-7.0.2
+          ./configure
+          make
+          make install
+          type -p texi2dvi
+          texi2dvi --version
 
     - name: Install Rust
       uses: actions-rs/toolchain@v1
