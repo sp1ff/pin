@@ -2,7 +2,7 @@
 #+DESCRIPTION: A command-line Pinboard client
 #+AUTHOR: Michael Herstine
 #+EMAIL: <sp1ff@pobox.com>
-#+DATE: <2023-05-06 Sat 15:38>
+#+DATE: <2023-06-13 Tue 18:30>
 #+AUTODATE: t
 #+STARTUP: overview
 
