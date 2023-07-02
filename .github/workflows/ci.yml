@@ -64,19 +64,11 @@ jobs:
       shell: bash
       run: |
           set -x
-          # Failure to do so causes `brew update` to fail
-          brew link --overwrite --dry-run python@3.11
-          rm '/usr/local/bin/2to3-3.11'
-          rm '/usr/local/bin/2to3'
-          rm '/usr/local/bin/idle3.11'
-          rm '/usr/local/bin/idle3'
-          rm '/usr/local/bin/pydoc3'
-          rm '/usr/local/bin/pydoc3.11'
-          rm '/usr/local/bin/python3'
-          rm '/usr/local/bin/python3-config'
-          rm '/usr/local/bin/python3.11'
-          rm '/usr/local/bin/python3.11-config'
+          set +e
           brew update
+          brew cleanup
+          # Will exit with non-zero status if it finds problems, but can be handy
+          # for trouble-shooting:
           brew doctor
           brew upgrade
           brew install autoconf automake emacs make
@@ -88,6 +80,7 @@ jobs:
       shell: bash
       run: |
           set -x
+          set -e
           mkdir tmp && cd tmp
           # TODO(sp1ff): cache this
           curl -L -O https://ftp.gnu.org/gnu/texinfo/texinfo-7.0.2.tar.gz
