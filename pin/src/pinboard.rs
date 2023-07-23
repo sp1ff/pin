@@ -530,7 +530,8 @@ mod test {
     #[test(tokio::test)]
     async fn test_get_all_tags() {
         // use RUST_LOG="mockito=debug" cargo test
-        let _mock = mockito::mock("GET",
+        let mut server = mockito::Server::new();
+        let _mock = server.mock("GET",
                                   Matcher::Regex(r"/v1/tags/get.*$".to_string()))
             .match_query(mockito::Matcher::AllOf(vec![
                 mockito::Matcher::UrlEncoded("format".into(), "json".into()),
@@ -546,7 +547,7 @@ mod test {
             .with_body("{\"1997\":1,\"2012\":1,\"2017\":1,\"2018\":3,\"2019\":6,\"2020\":51,\"2020-08-24\":1,\"2021\":103,\"2021-recall\":1}\t")
             .create();
 
-        let client = Client::new(&mockito::server_url(), "sp1ff:FFFFFFFFFFFFFFFFFFFF").unwrap();
+        let client = Client::new(&server.url(), "sp1ff:FFFFFFFFFFFFFFFFFFFF").unwrap();
         let rsp = client.get_all_tags().await;
         assert!(rsp.is_ok());
         let rsp = rsp.unwrap();

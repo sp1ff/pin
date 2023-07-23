@@ -606,13 +606,12 @@ mod test {
             deltas = mock.lock().unwrap().deltas();
         }
 
-        // TODO(sp1ff): to be removed, once this is consistently passing under Githhub Actions
-        eprintln!("deltas[0]: {}", deltas[0].as_millis());
-        eprintln!("deltas[1]: {}", deltas[1].as_millis());
-        eprintln!("deltas[2]: {}", deltas[2].as_millis());
-        eprintln!("deltas[3]: {}", deltas[3].as_millis());
-        eprintln!("deltas[4]: {}", deltas[4].as_millis());
-        eprintln!("deltas[5]: {}", deltas[5].as_millis());
+        debug!("deltas[0]: {}", deltas[0].as_millis());
+        debug!("deltas[1]: {}", deltas[1].as_millis());
+        debug!("deltas[2]: {}", deltas[2].as_millis());
+        debug!("deltas[3]: {}", deltas[3].as_millis());
+        debug!("deltas[4]: {}", deltas[4].as_millis());
+        debug!("deltas[5]: {}", deltas[5].as_millis());
 
         fn abs_diff_millis(lhs: Duration, rhs: Duration) -> u128 {
             if lhs <= rhs {

@@ -198,7 +198,9 @@ mod tests {
     #[test(tokio::test)]
     async fn smoke() {
         // use RUST_LOG="trace,hyper::proto=off,hyper::client=off,mio::poll=off,want=off" cargo test
-        let _mock = mockito::mock("GET", Matcher::Regex(r"/api/add.*$".to_string()))
+        let mut server = mockito::Server::new();
+        let _mock = server
+            .mock("GET", Matcher::Regex(r"/api/add.*$".to_string()))
             .match_query(mockito::Matcher::AllOf(vec![
                 UrlEncoded(
                     "url".into(),
@@ -230,8 +232,8 @@ mod tests {
             .with_body("{\"folders\": [], \"bookmark_id\": 1530380252}")
             .create();
 
-        let client = Client::new(&mockito::server_url(), "sp1ff@pobox.com", "c0fee")
-            .expect("Failed to build client");
+        let client =
+            Client::new(&server.url(), "sp1ff@pobox.com", "c0fee").expect("Failed to build client");
         let post = Post::new(
             "https://unherd.com/thepost/liz-cheneys-neoconservatism-is-dead/",
             Some("Liz Cheney's Neoconservativism is dead"),
