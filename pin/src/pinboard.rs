@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2023 Michael Herstine <sp1ff@pobox.com>
+// Copyright (C) 2020-2025 Michael Herstine <sp1ff@pobox.com>
 //
 // This file is part of pin.
 //
