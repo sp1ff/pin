@@ -28,7 +28,7 @@ jobs:
         include:
         - rust-build: pinned
           os: ubuntu-22.04
-          rust: 1.65
+          rust: 1.81
         - rust-build: stable
           os: ubuntu-22.04
           rust: stable
@@ -37,7 +37,7 @@ jobs:
           rust: nightly
         - rust-build: pinned
           os: macos-12
-          rust: 1.65
+          rust: 1.81
         - rust-build: stable
           os: macos-12
           rust: stable
