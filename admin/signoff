@@ -26,6 +26,12 @@ fi
 
 announce "Attempting sign-off on indielinks $SHA." $GREEN
 
+# This may fail
+set +e
+make distclean
+set -e
+./bootstrap
+./configure --prefix=$HOME
 run "admin/run-linters"
 run "admin/cargo-build-test-smoke"
 
