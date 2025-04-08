@@ -24,7 +24,7 @@ jobs:
           - pinned
           - stable
           - nightly
-        os: [ubuntu-22.04, macos-12]
+        os: [ubuntu-22.04, macos-14]
         include:
         - rust-build: pinned
           os: ubuntu-22.04
@@ -36,13 +36,13 @@ jobs:
           os: ubuntu-22.04
           rust: nightly
         - rust-build: pinned
-          os: macos-12
+          os: macos-14
           rust: 1.81
         - rust-build: stable
-          os: macos-12
+          os: macos-14
           rust: stable
         - rust-build: nightly
-          os: macos-12
+          os: macos-14
           rust: nightly
     runs-on: ${{ matrix.os }}
     env:
@@ -60,7 +60,7 @@ jobs:
           sudo apt-get install -y autoconf automake emacs liblzma-dev texlive
 
     - name: Install Tools (macOS)
-      if: matrix.os == 'macos-12'
+      if: matrix.os == 'macos-14'
       shell: bash
       run: |
           set -x
@@ -76,7 +76,7 @@ jobs:
           eval "$(/usr/libexec/path_helper)"
 
     - name: Install a modern version of Texinfo
-      if: matrix.os == 'macos-12'
+      if: matrix.os == 'macos-14'
       shell: bash
       run: |
           set -x
@@ -136,7 +136,7 @@ jobs:
       run: make distcheck
 
     - name: Check the Autotools distribution (MacOS)
-      if: matrix.os == 'macos-12'
+      if: matrix.os == 'macos-14'
       shell: bash
       run: |
         set -x

@@ -71,7 +71,7 @@ jobs:
           rust: stable
           target: x86_64-unknown-linux
         - build: macos
-          os: macos-12
+          os: macos-14
           rust: stable
           target: x86_64-apple-darwin
     steps:
@@ -87,7 +87,7 @@ jobs:
           sudo apt-get install -y autoconf automake emacs liblzma-dev texlive
 
     - name: Install Tools (macOS)
-      if: matrix.os == 'macos-12'
+      if: matrix.os == 'macos-14'
       shell: bash
       run: |
           set -x
@@ -99,7 +99,7 @@ jobs:
           eval "$(/usr/libexec/path_helper)"
 
     - name: Install a modern version of Texinfo
-      if: matrix.os == 'macos-12'
+      if: matrix.os == 'macos-14'
       shell: bash
       run: |
           set -x
