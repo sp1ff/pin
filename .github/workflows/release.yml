@@ -105,12 +105,12 @@ jobs:
           set -x
           mkdir tmp && cd tmp
           # TODO(sp1ff): cache this
-          curl -L -O https://ftp.gnu.org/gnu/texinfo/texinfo-7.0.2.tar.gz
-          tar xf texinfo-7.0.2.tar.gz
-          cd texinfo-7.0.2
-          ./configure
+          curl -L -O https://ftp.gnu.org/gnu/texinfo/texinfo-7.2.tar.gz
+          tar xf texinfo-7.2.tar.gz
+          cd texinfo-7.2
+          ./configure --with-libintl-prefix=/opt/homebrew
           make
-          make install
+          sudo make install
           type -p texi2dvi
           texi2dvi --version
 

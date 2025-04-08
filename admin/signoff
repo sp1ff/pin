@@ -18,6 +18,11 @@ run() {
   announce "Completed $1 in $INTERVAL seconds" $GREEN
 }
 
+# This may fail
+set +e
+make distclean
+set -e
+
 if [ -n "$(git status --porcelain)" ]; then
     echo "Can't sign-off on a dirty repository:" >&2
     git status
@@ -26,10 +31,6 @@ fi
 
 announce "Attempting sign-off on indielinks $SHA." $GREEN
 
-# This may fail
-set +e
-make distclean
-set -e
 ./bootstrap
 ./configure --prefix=$HOME
 run "admin/run-linters"
