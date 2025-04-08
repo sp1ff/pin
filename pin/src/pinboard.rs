@@ -42,7 +42,9 @@
 //!
 //! The Pinboard API advertises rate limits (although I haven't seen them enforced in the
 //! wild). This client implementation only deals in individual requests; for retry & backoff logic,
-//! see [`send_links_with_backoff`].
+//! see [make_requests_with_backoff].
+//!
+//! [make_requests_with_backoff]: crate::make_requests_with_backoff
 
 use reqwest::{IntoUrl, StatusCode, Url};
 use serde::{Deserialize, Serialize};
@@ -91,12 +93,12 @@ impl Response {
     async fn into_result(self) -> Result<()> {
         let status = self.0.status();
         if status.is_success() {
-            return Ok(());
+            Ok(())
         } else if status == StatusCode::TOO_MANY_REQUESTS {
             return Err(Error::RateLimit);
         } else {
             return PinboardSnafu {
-                status: status,
+                status,
                 text: self.0.text().await.ok(),
             }
             .fail();
@@ -176,7 +178,7 @@ impl std::convert::TryFrom<String> for Tag {
     type Error = Error;
     fn try_from(s: String) -> StdResult<Self, Self::Error> {
         // Seems a bit too cute; couldn't wriggle-out of the clone() in the error case :(
-        if '.' as u8
+        if b'.'
             == *s
                 .as_bytes()
                 .iter()
@@ -322,7 +324,9 @@ mod entity_tests {
 ///
 /// The Pinboard API advertises rate limits (although I haven't seen them enforced in the
 /// wild). This client implementation only deals in individual requests; for retry & backoff logic,
-/// see [`send_links_with_backoff`].
+/// see [make_requests_with_backoff].
+///
+/// [make_requests_with_backoff]: crate::make_requests_with_backoff
 #[derive(Clone, Debug)]
 pub struct Client {
     url: Url,
@@ -361,10 +365,10 @@ impl Post {
         I: Iterator<Item = Tag>,
     {
         Post {
-            link: link,
-            title: title,
+            link,
+            title,
             tags: tags.collect(),
-            read_later: read_later,
+            read_later,
         }
     }
 }
@@ -407,10 +411,9 @@ impl Client {
             .fail();
         }
 
-        Ok(rsp
-            .json::<HashMap<String, usize>>()
+        rsp.json::<HashMap<String, usize>>()
             .await
-            .context(HttpSnafu {})?)
+            .context(HttpSnafu {})
     }
     /// Send a single post
     #[tracing::instrument]
@@ -453,7 +456,7 @@ impl Client {
     /// Retrieve all posts; filter by zero or more tags. The docs say up to three tags are supported,
     /// but this implementation doesn't enforce that.
     #[tracing::instrument]
-    pub async fn all_posts<T>(&self, mut tags: T) -> Result<reqwest::Response>
+    pub async fn all_posts<T>(&self, tags: T) -> Result<reqwest::Response>
     where
         T: Iterator<Item = Tag> + Debug,
     {
@@ -461,11 +464,10 @@ impl Client {
             ("auth_token", self.token.clone()),
             ("format", "json".into()),
         ];
-        while let Some(tag) = tags.next() {
+        for tag in tags {
             query_params.push(("tag", tag.into()));
         }
-        Ok(self
-            .client
+        self.client
             .get(
                 self.url
                     .join("v1/posts/all")
@@ -474,7 +476,7 @@ impl Client {
             .query(&query_params)
             .send()
             .await
-            .context(HttpSnafu)?)
+            .context(HttpSnafu)
     }
     #[tracing::instrument]
     pub async fn delete_post(&self, url: Url) -> Result<()> {

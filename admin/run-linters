@@ -1,0 +1,12 @@
+#!/bin/bash
+set -x
+
+if rg -t rust 'TODO|TOOD|LATER|IN-?PROGRESS|\\todo|todo!|dbg!'; then
+    echo "You have TODO-s"
+    exit 1
+fi
+
+set -e
+cd pin
+cargo clippy -- --no-deps -Dwarnings
+RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps

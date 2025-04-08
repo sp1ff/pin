@@ -36,7 +36,9 @@
 //!
 //! The Instapaper API advertises rate limits (although I haven't seen them enforced in the
 //! wild). This client implementation only deals in individual requests; for retry & backoff logic,
-//! see [`make_requests_with_backoff`].
+//! see [make_requests_with_backoff].
+//!
+//! [make_requests_with_backoff]: crate::make_requests_with_backoff
 
 use reqwest::{IntoUrl, StatusCode, Url};
 use serde::Deserialize;
@@ -84,7 +86,9 @@ type Result<T> = StdResult<T, Error>;
 ///
 /// The Instapaper API advertises rate limits (although I haven't seen them enforced in the
 /// wild). This client implementation only deals in individual requests; for retry & backoff logic,
-/// see [`make_requests_with_backoff`].
+/// see [make_requests_with_backoff].
+///
+/// [make_requests_with_backoff]: crate::make_requests_with_backoff
 #[derive(Debug)]
 pub struct Client {
     url: Url,
@@ -116,18 +120,18 @@ impl Post {
     pub fn new<U: IntoUrl>(url: U, title: Option<&str>, selection: Option<&str>) -> Result<Post> {
         Ok(Post {
             url: url.into_url().context(BadUrlSnafu)?,
-            title: title.and_then(|s| Some(s.into())),
-            selection: selection.and_then(|s| Some(s.into())),
+            title: title.map(|s| s.into()),
+            selection: selection.map(|s| s.into()),
         })
     }
     pub fn url(&self) -> &Url {
         &self.url
     }
     pub fn title(&self) -> Option<&str> {
-        self.title.as_ref().and_then(|s| Some(s.as_ref()))
+        self.title.as_ref().map(|s| s.as_ref())
     }
     pub fn selection(&self) -> Option<&str> {
-        self.selection.as_ref().and_then(|s| Some(s.as_ref()))
+        self.selection.as_ref().map(|s| s.as_ref())
     }
 }
 
@@ -184,7 +188,7 @@ impl Client {
         } else if status == StatusCode::BAD_REQUEST {
             return Err(Error::RateLimit);
         } else {
-            return InstapaperSnafu { status: status }.fail();
+            return InstapaperSnafu { status }.fail();
         }
     }
 }

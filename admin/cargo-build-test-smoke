@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -ex
+cd pin
+cargo build
+cargo test
+RUST_LOG=trace,hyper::proto=off,hyper::client=off,mio::poll=off,want=off cargo test \
+    --features=personal-link-tests

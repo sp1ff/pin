@@ -105,7 +105,6 @@ pub async fn get_tags<W: std::io::Write + std::fmt::Debug>(
         .await
         .context(PinboardSnafu)?
         .drain()
-        .map(|(k, v)| (k, v))
         .collect::<Vec<(String, usize)>>();
     let max_lens = match csv {
         true => None,
@@ -187,6 +186,8 @@ pub async fn get_tags<W: std::io::Write + std::fmt::Debug>(
 /// back off appropriately. If possible, keep doubling the interval between requests until you stop
 /// receiving errors."
 ///
+/// [Pinboard]: https://pinboard.in
+/// [Instapaper]: https://www.instapaper.com
 /// [docs]: https://pinboard.in/api/
 ///
 /// Instapaper is a bit more coy, only [alluding] to rate-limiting in their documentation for a 400
@@ -247,14 +248,14 @@ where
         let last_sent = SystemTime::now();
         match post.send().await {
             Ok(_) => {
-                beta_ms = beta_ms / 2;
+                beta_ms /= 2;
                 trace!("beta :=> {}", beta_ms);
                 req = reqs.next();
             }
             Err(SendError::TooManyRequests) => {
                 beta_ms = beta_ms.checked_mul(2).unwrap_or(max_beta_ms);
                 trace!("beta :=> {}", beta_ms);
-                retries = retries + 1;
+                retries += 1;
                 if retries > max_retries {
                     return Err(Error::MaxRetriesExceeded);
                 }
@@ -275,7 +276,7 @@ where
             trace!("elapsed is {}", elapsed);
             // This could easily overflow, since `beta_ms` will defo be zero in some cases (i.e. no
             // pause; just try as fast as possible).
-            let backoff = beta_ms.checked_sub(elapsed).unwrap_or(0);
+            let backoff = beta_ms.saturating_sub(elapsed);
             debug!("Sleeping for {}ms...", backoff);
             tokio::time::sleep(std::time::Duration::from_millis(backoff)).await;
             debug!("Sleeping for {}ms...done.", backoff);
@@ -312,7 +313,7 @@ pub struct InstapaperPost<'a> {
 }
 
 #[async_trait]
-impl<'a> Sender for &InstapaperPost<'a> {
+impl Sender for &InstapaperPost<'_> {
     async fn send(&self) -> StdResult<(), SendError> {
         match self.client.send_link(&self.post).await {
             Ok(_) => Ok(()),
@@ -324,10 +325,7 @@ impl<'a> Sender for &InstapaperPost<'a> {
 
 impl<'a> InstapaperPost<'a> {
     pub fn new(client: &'a instapaper::Client, post: instapaper::Post) -> InstapaperPost<'a> {
-        InstapaperPost {
-            client: client,
-            post: post,
-        }
+        InstapaperPost { client, post }
     }
 }
 
@@ -348,7 +346,7 @@ pub struct PinboardPost<'a, 'b> {
 }
 
 #[async_trait]
-impl<'a, 'b> Sender for PinboardPost<'a, 'b> {
+impl Sender for PinboardPost<'_, '_> {
     /// Send a link to [Pinboard]. If so configured, call [`make_requests_with_backoff`] with the
     /// optional [Instapaper] link.
     ///
@@ -392,13 +390,13 @@ impl<'a, 'b> PinboardPost<'a, 'b> {
         PinboardPost {
             client: pin_client,
             post: pin_post,
-            insty: instapaper.and_then(|(client, post, atom, max_beta, max_retries)| {
-                Some((
+            insty: instapaper.map(|(client, post, atom, max_beta, max_retries)| {
+                (
                     InstapaperPost::new(client, post),
                     atom,
                     max_beta,
                     max_retries,
-                ))
+                )
             }),
         }
     }
@@ -606,7 +604,7 @@ mod test {
             deltas = mock.lock().unwrap().deltas();
         }
 
-        // TODO(sp1ff): to be removed, once this is consistently passing under Githhub Actions
+        // This has been touchy in the past; I think I'll keep it here:
         eprintln!("deltas[0]: {}", deltas[0].as_millis());
         eprintln!("deltas[1]: {}", deltas[1].as_millis());
         eprintln!("deltas[2]: {}", deltas[2].as_millis());

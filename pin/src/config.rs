@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License along with pin.  If not, see
 // <http://www.gnu.org/licenses/>.
 
-//! [`pin`] configuration items.
+//! `pin` configuration items.
 //!
 //! Some runtime options are complex enough that they would be inconvenient to specify on the
 //! comnand-line.  Some are likely to be the same across many invocations, and so specifying them
@@ -27,26 +27,16 @@ use std::collections::HashMap;
 
 type StdResult<T, E> = std::result::Result<T, E>;
 
-/// A [`Target`] is pre-defined set of Pinboard [`Tag`]s together a few other options applicable to
+/// A [Target] is pre-defined set of Pinboard [Tag]s together a few other options applicable to
 /// sending links to Pinboard; in other words, a pre-defined "place" at Pinboard to which links may
 /// be sent.
 ///
-/// [`Tag`]: pin::pinboard::Tag
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// [Tag]: crate::pinboard::Tag
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Target {
     read_later: bool,
     send_to_insty: bool,
     tags: Vec<Tag>,
-}
-
-impl std::default::Default for Target {
-    fn default() -> Self {
-        Target {
-            read_later: false,
-            send_to_insty: false,
-            tags: Vec::new(),
-        }
-    }
 }
 
 impl std::fmt::Display for Target {
@@ -81,17 +71,17 @@ impl Target {
 /// Application configuration
 ///
 /// Generally speaking, I include a version attribute in all my configuration file formats. This
-/// allows evolving the file format while still supporting older versions. Regrettably, I release
-/// [`pin`] 0.1 without such a field. I added it belatedly in 0.2, using the `default` [serde]
+/// allows evolving the file format while still supporting older versions. Regrettably, I released
+/// `pin` 0.1 without such a field. I added it belatedly in 0.2, using the `default` [serde]
 /// attribute to enable older files to still be read (they'll show up as having version 0). This
 /// still restricts me to non-breaking changes: i.e. adding optional fields for as long as I want to
 /// maintain backward compatibility (usually I use the "internal tagging" [serde] trick to read
-/// different versons as distinct types). Ah, well, when & if [`pin`] reaches 1.0 status I can sort
-/// it out then.
+/// different versons as distinct types). Ah, well, when & if `pin` reaches 1.0 status I can sort it
+/// out then.
 ///
 /// [serde]: https://serde.rs/
 /// [internal tagging]: https://serde.rs/enum-representations.html#internally-tagged
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Config {
     #[serde(default)]
     version: u32,
@@ -105,18 +95,6 @@ pub struct Config {
     /// Instapaper password
     #[serde(rename = "password")]
     insty_password: Option<String>,
-}
-
-impl std::default::Default for Config {
-    fn default() -> Self {
-        Config {
-            version: 0,
-            token: None,
-            targets: None,
-            insty_username: None,
-            insty_password: None,
-        }
-    }
 }
 
 impl Config {

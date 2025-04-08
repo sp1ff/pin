@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License along with pin.  If not, see
 // <http://www.gnu.org/licenses/>.
 
-//! Produce a [`Stream`] of [`Url`]s.
+//! Produce a Stream of [Url]s.
 
 use crate::pinboard;
 
@@ -58,15 +58,15 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
-/// [`GreedyUrlStream`] is a state machine. [`Pending`] is a sum type representing the set of
+/// [GreedyUrlStream] is a state machine. [Pending] is a sum type representing the set of
 /// states.
 ///
-/// [`GreedyUrlStream`] accepts as input an iterator over items that can be either [`Url`]s or
-/// [`Tag`]s. When it encounters a [`Tag`], it issues a call to the `/posts/all` endpoint,
-/// scoped by tag, from which it produces more [`Url`]s. To implement this, [`GreedyUrlStream`]
+/// [GreedyUrlStream] accepts as input an iterator over items that can be either [Url]s or
+/// [Tag]s. When it encounters a [Tag], it issues a call to the `/posts/all` endpoint,
+/// scoped by tag, from which it produces more [Url]s. To implement this, [GreedyUrlStream]
 /// moves through the following states.
 ///
-/// In each case, we can't name the type that implements [`Future`], so we need a Trait object.
+/// In each case, we can't name the type that implements [Future], so we need a Trait object.
 /// If I try to _require_ the Trait object to be Unpin, I get:
 ///
 /// ```text
@@ -77,7 +77,7 @@ type Result<T> = std::result::Result<T, Error>;
 /// Future is not implemented for `Box<F: Future>`; it *is* for [`futures::BoxFuture`].
 enum Pending {
     /// No outstanding tags; subsequent calls to [`poll_next`] will yield any previously
-    /// "banked" [`Url`]s, until they are exhausted (at which point [`None`] will be returned).
+    /// "banked" [Url]s, until they are exhausted (at which point [None] will be returned).
     None,
     /// We've sent a `/post/all` request & are awaiting the response
     AwaitingResponse(BoxFuture<'static, pinboard::Result<reqwest::Response>>),
@@ -91,6 +91,7 @@ enum Pending {
     ),
     /// We've received the first chunk of the most recent response and are processing its
     /// successors.
+    #[allow(clippy::type_complexity)] // Consider cleaning this up later
     ProcessingResponseBody(
         (
             // The request whose body we're processing
@@ -131,13 +132,14 @@ struct Entry {
     href: String,
 }
 
-/// [`Stream`] implementation that takes as input a sequence of [`String`]s and produces a
-/// seqeunce [`Url`]s for deletion.
+/// Stream implementation that takes as input a sequence of [String]s and produces a
+/// seqeunce [Url]s for deletion.
 ///
-/// Each [`String`] in the input sequence will first be interpreted as an [`Url`] and, if that is
-/// succesful, the resulting [`Url`] will be yielded. If that fails, the input [`String`] will be
-/// interpreted as a [`Tag`] or [`Tag`]s which will in turn be mapped to a sequence of [`Url`]s.
-// LATER(sp1ff): If I remove this attribute, all hell breaks loose-- understand why.
+/// Each [String] in the input sequence will first be interpreted as an [Url] and, if that is
+/// succesful, the resulting [Url] will be yielded. If that fails, the input [String] will be
+/// interpreted as a [Tag] or [Tag]s which will in turn be mapped to a sequence of [Url]s.
+///
+/// [Tag]: crate::pinboard::Tag
 #[pin_project]
 pub struct GreedyUrlStream<I>
 where
@@ -147,13 +149,13 @@ where
     // lifetime!
     client: pinboard::Client,
     url_or_tags: I,
-    /// [`Url`] instances that have been parsed already; each invocation of [`poll_next`] will
+    /// [Url] instances that have been parsed already; each invocation of [`poll_next`] will
     /// produce members.
     banked_urls: VecDeque<Result<Url>>,
-    /// [`url_or_tags`] `Item`s that can't be parsed as [`Url`]s are interpreted as [`Tag`]s
-    /// which produce calls to `/posts/all` scoped by that [`Tag`]. As this instance moves
+    /// [`url_or_tags`] Items that can't be parsed as [Url]s are interpreted as [Tag]s
+    /// which produce calls to `/posts/all` scoped by that [Tag]. As this instance moves
     /// through the phases of sending the request, receiving the response headers, and parsing
-    /// the response body into [`Url`]s this member tracks our state.
+    /// the response body into [Url]s this member tracks our state.
     current_request: Pending,
 }
 
@@ -161,16 +163,16 @@ impl<I> GreedyUrlStream<I>
 where
     I: Iterator<Item = String>,
 {
-    /// Consume the iterator until we hit a [`Tag`] or [`Tag`]s, at which point we produce a
-    /// request. Return a collection of the [`Url`]s we attempted to parse along with the
-    /// appropriate value of [`Pending`].
+    /// Consume the iterator until we hit a [Tag] or [Tag]s, at which point we produce a
+    /// request. Return a collection of the [Url]s we attempted to parse along with the
+    /// appropriate value of [Pending].
     fn parse_urls_to_tag(
         client: &pinboard::Client,
         url_or_tags: &mut I,
     ) -> (VecDeque<Result<Url>>, Pending) {
         let mut banked_urls = VecDeque::new();
         let mut current_request = Pending::None;
-        while let Some(item) = url_or_tags.next() {
+        for item in url_or_tags {
             // I have a string... can I interpret it as an URL?
             match Url::parse(&item) {
                 Ok(url) => banked_urls.push_back(Ok(url)),
@@ -178,7 +180,7 @@ where
                     // Attempt to interpret `item` as one or more tags.
                     match item
                         .split("+")
-                        .map(|text| pinboard::Tag::from_str(text))
+                        .map(pinboard::Tag::from_str)
                         .collect::<pinboard::Result<Vec<pinboard::Tag>>>()
                     {
                         Ok(tags) => {
@@ -197,25 +199,28 @@ where
         (banked_urls, current_request)
     }
 
-    /// Produce a [`GreedyUrlStream`] from a Pinboard [`Client`] and a sequence of
-    /// [`String`]. Items will be interepreted as either [`Url`]s to be deleted, or [`Tag`]s
-    /// whose associated posts will be deleted.
+    /// Produce a [GreedyUrlStream] from a Pinboard [Client] and a sequence of [String]. Items will
+    /// be interepreted as either [Url]s to be deleted, or [Tag]s whose associated posts will be
+    /// deleted.
+    ///
+    /// [Client]: crate::pinboard::Client
+    /// [Tag]: crate::pinboard::Tag
     pub fn new(client: pinboard::Client, mut url_or_tags: I) -> Result<GreedyUrlStream<I>> {
         let (banked_urls, current_request) =
             GreedyUrlStream::parse_urls_to_tag(&client, &mut url_or_tags);
 
         Ok(GreedyUrlStream {
-            client: client,
-            url_or_tags: url_or_tags,
-            banked_urls: banked_urls,
-            current_request: current_request,
+            client,
+            url_or_tags,
+            banked_urls,
+            current_request,
         })
     }
 
     fn consume_more_urls_or_tags(&mut self) {
         let (banked_urls, current_request) =
             GreedyUrlStream::parse_urls_to_tag(&self.client, &mut self.url_or_tags);
-        self.banked_urls.extend(banked_urls.into_iter());
+        self.banked_urls.extend(banked_urls);
         self.current_request = current_request;
     }
 }
@@ -224,10 +229,10 @@ fn short_string(b: &[u8]) -> &str {
     std::str::from_utf8(&b[0..min(b.len(), 32)]).unwrap()
 }
 
-/// Take the current parse buffer, read as many [`Url`]s as possible out of it. Return the new parse
+/// Take the current parse buffer, read as many [Url]s as possible out of it. Return the new parse
 /// buffer, the results of parsing, and the number of bytes that should be skipped when the parse
 /// buffer again becomes large enough (in general, this will be zero, but it could happen that the
-/// current parse buffer _just_ contained an [`Entry`], and the suceeding ",\n" aren't available to
+/// current parse buffer _just_ contained an [Entry], and the suceeding ",\n" aren't available to
 /// be skipped until the next chunk arrives).
 // I need to reconsider how the parse buffer is carried around-- this implementation makes needless
 // copies all over the place. I think it likely should be a bytes::MutBytes instance.
@@ -235,7 +240,7 @@ fn parse_urls_from_chunk(buf: &mut Vec<u8>) -> Result<(Vec<u8>, VecDeque<Url>, u
     trace!(
         "Starting to parse URLs: {}:{}...",
         buf.len(),
-        short_string(&buf)
+        short_string(buf)
     );
     let mut urls = VecDeque::new();
     let mut bytes_to_consume = 0;
@@ -245,7 +250,7 @@ fn parse_urls_from_chunk(buf: &mut Vec<u8>) -> Result<(Vec<u8>, VecDeque<Url>, u
         if buf.len() == 1 && buf[0] == b']' {
             break;
         }
-        let mut deser = Deserializer::from_slice(&buf).into_iter::<Entry>();
+        let mut deser = Deserializer::from_slice(buf).into_iter::<Entry>();
         // `deser.next()` returns an Option<Result<Entry, serde_json::Error>>.
         // So: first-off: did we parse anything:
         match deser.next() {
@@ -286,7 +291,7 @@ fn parse_urls_from_chunk(buf: &mut Vec<u8>) -> Result<(Vec<u8>, VecDeque<Url>, u
         }
     }
 
-    trace!("The buffer is now: {}:{}...", buf.len(), short_string(&buf));
+    trace!("The buffer is now: {}:{}...", buf.len(), short_string(buf));
 
     // One final, needless copy on the way out.
     Ok((buf.to_vec(), urls, bytes_to_consume))
@@ -461,7 +466,7 @@ where
                                         }
                                     };
                                     self.current_request = req;
-                                    self.banked_urls.extend(urls.into_iter().map(|url| Ok(url)));
+                                    self.banked_urls.extend(urls.into_iter().map(Ok));
                                 }
                             }
                         }
@@ -500,7 +505,7 @@ where
                                         }
                                     };
                                     self.current_request = req;
-                                    self.banked_urls.extend(urls.into_iter().map(|url| Ok(url)));
+                                    self.banked_urls.extend(urls.into_iter().map(Ok));
                                 }
                                 None => {
                                     // We've processed the response entirely; IOW, we've processed the
@@ -528,9 +533,9 @@ mod test {
 
     use std::collections::HashMap;
 
-    /// [Mockito]-like local HTTP server for testing [`GreedyUrlStream`].
+    /// [Mockito]-like local HTTP server for testing [GreedyUrlStream].
     ///
-    /// This struct will listen for HTTP requests on an arbitrary open port on `localhost`. It is
+    /// This struct will listen for HTTP requests on an arbitrary open port on localhost. It is
     /// capable of responding to two requests:
     ///
     /// 1. `GET /v1/posts/all` in which case it will respond with a list of Posts configured at
@@ -539,8 +544,8 @@ mod test {
     /// 2. `GET /v1/posts/delete` in which case it will note the URL that it was asked to delete
     ///
     /// The idea is that a unit test can whip-up a server instance with a pre-configured mapping of
-    /// tags to URLs, instantiate a [`GreedyUrlStream`] on a client pointing to that instance and a
-    /// sequence of tags & URLs, and ensure that the [`GreedyUrlStream`] implementation yields the
+    /// tags to URLs, instantiate a [GreedyUrlStream] on a client pointing to that instance and a
+    /// sequence of tags & URLs, and ensure that the [GreedyUrlStream] implementation yields the
     /// correct sequence of URLs. Tests can also emit delete requests interleaved with the
     /// traversal, then check with the server instance to see that it got the correct sequence of
     /// delete requests.
@@ -706,7 +711,7 @@ mod link_tests {
 
     use std::path::Path;
 
-    /// [Mockito]-like local HTTP server for testing [`GreedyUrlStream`].
+    /// [Mockito]-like local HTTP server for testing [GreedyUrlStream].
     ///
     /// This function will listen asynchronously for an HTTP request on an arbitrary open port on
     /// `localhost`. It expects a `GET /v1/posts/all` request to which it will respond with a body

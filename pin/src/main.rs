@@ -119,9 +119,9 @@ enum Error {
 
 impl std::fmt::Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}\n", self)?;
+        writeln!(f, "{}", self)?;
         if let Some(back) = snafu::ErrorCompat::backtrace(&self) {
-            write!(f, "{}\n", back)?;
+            writeln!(f, "{}", back)?;
         }
         Ok(())
     }
@@ -289,8 +289,8 @@ fn add_rename_tag(app: App<'_>) -> App<'_> {
 ///    - `-d` :=> sets the tracing level to DEBUG, `-v` to INFO, and `-q` to ERROR
 /// 2. This can be overridden by the RUST_LOG environment variable
 /// 3. If `-d` is given, use the HierarchicalLayer with a format that produces detailed,
-/// syslog-style messages; otherwise just use a stock fmt Layer that produces human-friendly
-/// output.
+///    syslog-style messages; otherwise just use a stock fmt Layer that produces human-friendly
+///    output.
 /// 4. If `-d` is given, add the ChromeLayer
 fn configure_tracing(matches: &ArgMatches) {
     use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter, Registry};
@@ -413,7 +413,7 @@ async fn send_tags(sub: &ArgMatches, cfg: Config, client: Client) -> Result<()> 
     let mut tags = match sub.get_many::<String>("tag") {
         Some(iter) => iter
             .cloned()
-            .map(|s| -> Result<Tag> { Ok(Tag::try_from(s).context(PinboardSnafu)?) })
+            .map(|s| -> Result<Tag> { Tag::try_from(s).context(PinboardSnafu) })
             .collect::<Result<Vec<Tag>>>()?,
         None => Vec::new(),
     };
@@ -433,7 +433,7 @@ async fn send_tags(sub: &ArgMatches, cfg: Config, client: Client) -> Result<()> 
         let env_username = std::env::var("INSTAPAPER_USERNAME");
         let username = sub
             .get_one::<String>("username")
-            .or_else(|| match env_username.as_ref() {
+            .or(match env_username.as_ref() {
                 Ok(s) => Some(s),
                 Err(_) => None,
             })
@@ -441,13 +441,13 @@ async fn send_tags(sub: &ArgMatches, cfg: Config, client: Client) -> Result<()> 
         let env_password = std::env::var("INSTAPAPER_PASSWORD");
         let password = sub
             .get_one::<String>("password")
-            .or_else(|| match env_password.as_ref() {
+            .or(match env_password.as_ref() {
                 Ok(s) => Some(s),
                 Err(_) => None,
             })
             .ok_or(Error::NoPassword)?;
         Some(
-            pin::instapaper::Client::new("https://www.instapaper.com", &username, &password)
+            pin::instapaper::Client::new("https://www.instapaper.com", username, password)
                 .context(InstapaperSnafu)?,
         )
     } else {
@@ -467,7 +467,7 @@ async fn send_tags(sub: &ArgMatches, cfg: Config, client: Client) -> Result<()> 
         // Ignore blank lines, if requested
         .filter(|arg| {
             if sub.is_present("ignore-blank") {
-                arg.trim().len() != 0
+                !arg.trim().is_empty()
             } else {
                 true
             }
@@ -476,10 +476,10 @@ async fn send_tags(sub: &ArgMatches, cfg: Config, client: Client) -> Result<()> 
             // We need an iterator yielding Posts. Let's figure out the link & the title:
             let split: (&str, &str) = arg
                 .find(" | ")
-                .and_then(|idx| Some((&arg[0..idx], &arg[idx + 3..])))
+                .map(|idx| (&arg[0..idx], &arg[idx + 3..]))
                 .or_else(|| {
                     sub.get_one::<String>("title")
-                        .and_then(|title| Some((arg.as_ref(), title.as_ref())))
+                        .map(|title| (arg.as_ref(), title.as_ref()))
                 })
                 .ok_or(
                     MissingTitleSnafu {
@@ -511,7 +511,7 @@ async fn send_tags(sub: &ArgMatches, cfg: Config, client: Client) -> Result<()> 
                 pin_post,
                 insty
                     .as_ref()
-                    .and_then(|client| Some((client, insty_post.unwrap(), atom.clone(), 1000, 5))),
+                    .map(|client| (client, insty_post.unwrap(), atom.clone(), 1000, 5)),
             ))
         })
         .collect::<Result<Vec<PinboardPost>>>()?;
@@ -519,7 +519,7 @@ async fn send_tags(sub: &ArgMatches, cfg: Config, client: Client) -> Result<()> 
     pin::make_requests_with_backoff(posts.len(), posts.into_iter(), 3000, 10000, 5)
         .await
         .context(PinSnafu)
-        .and_then(|_| Ok(()))
+        .map(|_| ())
 }
 
 /// `delete` sub-command implementation
@@ -617,7 +617,7 @@ async fn main() -> Result<()> {
     let env_token = std::env::var("PINBOARD_API_TOKEN");
     let token = matches
         .get_one::<String>("token")
-        .or_else(|| match env_token.as_ref() {
+        .or(match env_token.as_ref() {
             Ok(s) => Some(s),
             Err(_) => None,
         })
@@ -637,8 +637,8 @@ async fn main() -> Result<()> {
     } else if let Some(sub) = matches.subcommand_matches("delete") {
         delete_tags(sub, client).await
     } else if let Some(sub) = matches.subcommand_matches("rename-tag") {
-        let from = Tag::from_str(&sub.get_one::<String>("from").unwrap()).context(PinboardSnafu)?;
-        let to = Tag::from_str(&sub.get_one::<String>("to").unwrap()).context(PinboardSnafu)?;
+        let from = Tag::from_str(sub.get_one::<String>("from").unwrap()).context(PinboardSnafu)?;
+        let to = Tag::from_str(sub.get_one::<String>("to").unwrap()).context(PinboardSnafu)?;
         client.rename_tag(&from, &to).await.context(PinboardSnafu)
     } else {
         Err(Error::NoSubCommand)
