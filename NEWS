@@ -2,6 +2,9 @@ pin News -- history of user-visible changes           -*- outline -*-
 
 * 0.2 builds
 
+** 0.2.9
+
+Hygienic release: updated copyrights & dependenices, fixed the C/I workflow.
 ** 0.2.8
 
 *** Hopefully fix the intermittent failure in the unit tests

@@ -2,7 +2,7 @@
 #+DESCRIPTION: A command-line Pinboard client
 #+AUTHOR: Michael Herstine
 #+EMAIL: <sp1ff@pobox.com>
-#+DATE: <2023-06-13 Tue 18:30>
+#+DATE: <2025-04-09 Wed 11:20>
 #+AUTODATE: t
 #+STARTUP: overview
 
@@ -63,16 +63,16 @@ Type =pin --help= for a description of all flags & sub-commands.
 [[https://github.com/sp1ff/pin][pin]] is GPL v3 software.
 * Prerequistes
 
-The Rust [[https://rustup.rs/][toolchain]] (Rust version 1.57 at minimum).
+The Rust [[https://rustup.rs/][toolchain]] (Rust version 1.81 at minimum).
 * Installation
 
 This crate is available on [[https://crates.io][crates.io]], but you can also download an Autotools tarball:
 
 #+BEGIN_SRC bash
 cd /tmp
-curl -O https://www.unwoundstack.com/dist/pin-0.2.8.tar.xz
-tar xf pin-0.2.8.tar.xz
-cd pin-0.2.8
+curl -O https://www.unwoundstack.com/dist/pin-0.2.9.tar.xz
+tar xf pin-0.2.9.tar.xz
+cd pin-0.2.9
 ./configure
 make
 make check
@@ -86,6 +86,6 @@ sudo make install
   - delete those links one at a time (because that is what the API allows)
   - while respecting the API's rate limits
 
-In other words, this package is intended to provide an interface organized around user operations, not API endpoints.
+In other words, this package is intended to provide an interface organized around user operations, not API endpoints. Documentation is available [[https://www.unwoundstack.com/doc/pin/curr][here]].
 
 Bugs, comments, problems, PRs, feature requests &c welcome at [[mailto:sp1ff@pobox.com][sp1ff@pobox.com]] and in the [[https://github.com/sp1ff/pin/issues][issues]].

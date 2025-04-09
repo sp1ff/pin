@@ -1,3 +1,70 @@
+2025-04-09  Michael Herstine  <sp1ff@pobox.com>
+
+	Cut release 0.2.9
+
+2025-04-08  Michael Herstine  <sp1ff@pobox.com>
+
+	Fix the "CI" workflow.
+	Upgrade the MacOS version on the GHA runners; upgrade the TexInfo
+	version installed; fix the TexInfo install installation by giving
+	the libintl location explicitly.
+
+	Have `signoff` cleanup & configure the project, first.
+	This patch udpates `signoff` to make distclean, then bootstrap
+	& configure the project.
+
+	Upgrade MacOS GHA runners from 12 to 14
+
+	Lint the project.
+	Correct assorted clippy warnings, `cargo doc` errors and personal
+	lints. This commit also adds a "signoff" script meant to be run
+	on the development machine.
+
+	Update the pinned version of Rust to 1.81.
+
+2025-04-06  Michael Herstine  <sp1ff@pobox.com>
+
+	Updated all dependencies
+
+	Update copyrights throughout
+
+2023-07-03  Michael Herstine  <sp1ff@pobox.com>
+
+	Fix the Continuous Integration job.
+	I _think_ I've discovered the correct `brew` incantations.
+	But I also think there was something wrong on the Github
+	side.
+
+2023-07-02  Michael Herstine  <sp1ff@pobox.com>
+
+	Fix CI
+
+2023-07-01  Michael Herstine  <sp1ff@pobox.com>
+
+	Fix the build with nightly.
+	See here: <https://github.com/rust-lang/rust/issues/113152>. Lock
+	file updated after doing a `cargo update`.
+
+2023-06-14  Michael Herstine  <sp1ff@pobox.com>
+
+	Fix CI workflow.
+	`brew update` stumbled on several more links in /usr/local/bin that
+	it couldn't remove.
+
+2023-05-08  Michael Herstine  <sp1ff@pobox.com>
+
+	Merge infra work; comment-out release scaffolding
+
+	Remove brew update
+
+2023-05-07  Michael Herstine  <sp1ff@pobox.com>
+
+	Updating release workflow to macos-12; all references
+
+	Updating release workflow to macos-12
+
+	Re-trying release workflow
+
 2023-05-06  Michael Herstine  <sp1ff@pobox.com>
 
 	Make `pin` 0.2.8:
