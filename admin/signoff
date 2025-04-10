@@ -29,11 +29,11 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 1
 fi
 
-announce "Attempting sign-off on indielinks $SHA." $GREEN
+announce "Attempting sign-off on pin $SHA." $GREEN
 
 ./bootstrap
 ./configure --prefix=$HOME
 run "admin/run-linters"
 run "admin/cargo-build-test-smoke"
 
-announce "Signed off on indielinks $SHA in $SECONDS seconds 🍻" $GREEN
+announce "Signed off on pin $SHA in $SECONDS seconds 🍻" $GREEN
