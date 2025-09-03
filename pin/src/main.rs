@@ -31,7 +31,7 @@ use pin::{
 };
 use reqwest::Url;
 
-use clap::{App, Arg, ArgMatches};
+use clap::{App, Arg, ArgAction, ArgMatches, value_parser};
 use snafu::{Backtrace, IntoError, ResultExt, Snafu};
 use tracing::{info, trace};
 
@@ -333,7 +333,8 @@ fn configure_tracing(matches: &ArgMatches) {
                 .with_level(false)
                 .with_file(false)
                 .with_line_number(false)
-                .with_target(false),
+                .with_target(false)
+                .with_ansi(!matches.get_flag("plain")),
         );
     }
 
@@ -390,8 +391,15 @@ fn make_app(dot_pin: Option<&mut PathBuf>) -> App<'_> {
             Arg::new("quiet")
                 .short('q')
                 .long("quiet")
-                .long("quiet")
                 .help("Suppress all output other than errors"),
+        )
+        .arg(
+            Arg::new("plain")
+                .short('p')
+                .long("plain")
+                .value_parser(value_parser!(bool))
+                .action(ArgAction::SetTrue)
+                .help("Disable ANSI escape codes in output")
         )
         .arg(cfg_arg)
 }
