@@ -23,11 +23,11 @@
 
 use pin::pinboard::Client;
 use pin::{
+    PinboardPost,
     config::{Config, Target},
     get_tags,
     pinboard::{Tag, Title},
     url_stream::GreedyUrlStream,
-    PinboardPost,
 };
 use reqwest::Url;
 
@@ -92,11 +92,17 @@ enum Error {
     MissingTitle { link: String, backtrace: Backtrace },
     #[snafu(display("Unkown sub-command."))]
     NoSubCommand,
-    #[snafu(display("You didn't specify a Pinboard API token on the command-line, the environment, or in your configuration file (if any). You can find your API key at https://pinboard.in/settings/password once you've signed-up & logged-in."))]
+    #[snafu(display(
+        "You didn't specify a Pinboard API token on the command-line, the environment, or in your configuration file (if any). You can find your API key at https://pinboard.in/settings/password once you've signed-up & logged-in."
+    ))]
     NoToken,
-    #[snafu(display("You asked `pin` to send a link to Instapaper, but you didn't specify your Instapaper username."))]
+    #[snafu(display(
+        "You asked `pin` to send a link to Instapaper, but you didn't specify your Instapaper username."
+    ))]
     NoUsername,
-    #[snafu(display("You asked `pin` to send a link to Instapaper, but you didn't specify your Instapaper password."))]
+    #[snafu(display(
+        "You asked `pin` to send a link to Instapaper, but you didn't specify your Instapaper password."
+    ))]
     NoPassword,
     #[snafu(display("Application error: {source}"))]
     Pin {
@@ -293,7 +299,7 @@ fn add_rename_tag(app: App<'_>) -> App<'_> {
 ///    output.
 /// 4. If `-d` is given, add the ChromeLayer
 fn configure_tracing(matches: &ArgMatches) {
-    use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter, Registry};
+    use tracing_subscriber::{EnvFilter, Registry, fmt, layer::SubscriberExt};
     use tracing_tree::HierarchicalLayer;
 
     let subscriber = Registry::default();
@@ -433,18 +439,12 @@ async fn send_tags(sub: &ArgMatches, cfg: Config, client: Client) -> Result<()> 
         let env_username = std::env::var("INSTAPAPER_USERNAME");
         let username = sub
             .get_one::<String>("username")
-            .or(match env_username.as_ref() {
-                Ok(s) => Some(s),
-                Err(_) => None,
-            })
+            .or(env_username.as_ref().ok())
             .ok_or(Error::NoUsername)?;
         let env_password = std::env::var("INSTAPAPER_PASSWORD");
         let password = sub
             .get_one::<String>("password")
-            .or(match env_password.as_ref() {
-                Ok(s) => Some(s),
-                Err(_) => None,
-            })
+            .or(env_password.as_ref().ok())
             .ok_or(Error::NoPassword)?;
         Some(
             pin::instapaper::Client::new("https://www.instapaper.com", username, password)
@@ -568,7 +568,7 @@ async fn main() -> Result<()> {
 
     // & parse the command line.
     let matches = app.get_matches(); // NB. --help & --version handled here (we won't return if
-                                     // either was given)
+    // either was given)
 
     // Next-up: configure logging:
     configure_tracing(&matches);
@@ -617,10 +617,8 @@ async fn main() -> Result<()> {
     let env_token = std::env::var("PINBOARD_API_TOKEN");
     let token = matches
         .get_one::<String>("token")
-        .or(match env_token.as_ref() {
-            Ok(s) => Some(s),
-            Err(_) => None,
-        })
+        .or(env_token.as_ref().ok())
+        .or(cfg.token())
         .ok_or(Error::NoToken)?;
 
     let client = Client::new("https://api.pinboard.in", token).context(PinboardSnafu)?;
@@ -653,7 +651,7 @@ async fn main() -> Result<()> {
 mod test {
     use super::*;
 
-    use mockito::{mock, Matcher};
+    use mockito::{Matcher, mock};
 
     #[tokio::test]
     async fn test_ignore_blanks() {

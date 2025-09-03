@@ -48,7 +48,7 @@
 
 use reqwest::{IntoUrl, StatusCode, Url};
 use serde::{Deserialize, Serialize};
-use snafu::{prelude::*, Backtrace};
+use snafu::{Backtrace, prelude::*};
 use unicode_segmentation::UnicodeSegmentation;
 
 use std::collections::HashMap;
@@ -95,13 +95,13 @@ impl Response {
         if status.is_success() {
             Ok(())
         } else if status == StatusCode::TOO_MANY_REQUESTS {
-            return Err(Error::RateLimit);
+            Err(Error::RateLimit)
         } else {
-            return PinboardSnafu {
+            PinboardSnafu {
                 status,
                 text: self.0.text().await.ok(),
             }
-            .fail();
+            .fail()
         }
     }
 }
