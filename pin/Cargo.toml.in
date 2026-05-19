@@ -2,7 +2,7 @@
 name = "pin"
 version = "@PACKAGE_VERSION@"
 authors = ["@PACKAGE_AUTHOR@"]
-edition = "2021"
+edition = "2024"
 
 license = "GPL-3.0-or-later"
 description = "Pinboard (and Instapaper) client"
