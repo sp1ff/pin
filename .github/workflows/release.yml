@@ -22,8 +22,8 @@ jobs:
     name: create-release
     runs-on: ubuntu-latest
     # Un-comment this for testing
-    env:
-      RELEASE_VERSION: 0.2.9
+    # env:
+    #   RELEASE_VERSION: 0.2.9
     steps:
       - name: Create artifacts directory
         run: mkdir artifacts
@@ -67,11 +67,11 @@ jobs:
         build: [linux, macos]
         include:
         - build: linux
-          os: ubuntu-22.04
+          os: ubuntu-latest
           rust: stable
           target: x86_64-unknown-linux
         - build: macos
-          os: macos-14
+          os: macos-latest
           rust: stable
           target: x86_64-apple-darwin
     steps:
@@ -79,7 +79,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Install Tools (Ubuntu)
-      if: matrix.os == 'ubuntu-22.04'
+      if: matrix.os == 'ubuntu-latest'
       shell: bash
       run: |
           set -x
@@ -87,7 +87,7 @@ jobs:
           sudo apt-get install -y autoconf automake emacs liblzma-dev texlive
 
     - name: Install Tools (macOS)
-      if: matrix.os == 'macos-14'
+      if: matrix.os == 'macos-latest'
       shell: bash
       run: |
           set -x
@@ -99,7 +99,7 @@ jobs:
           eval "$(/usr/libexec/path_helper)"
 
     - name: Install a modern version of Texinfo
-      if: matrix.os == 'macos-14'
+      if: matrix.os == 'macos-latest'
       shell: bash
       run: |
           set -x
@@ -115,11 +115,9 @@ jobs:
           texi2dvi --version
 
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: ${{ matrix.rust }}
-        profile: minimal
-        override: true
 
     - name: Configure pin
       shell: bash
@@ -182,7 +180,7 @@ jobs:
         asset_content_type: application/octet-stream
 
     - name: Upload gzip tarball
-      if: matrix.os == 'ubuntu-22.04'
+      if: matrix.os == 'ubuntu-latest'
       uses: actions/upload-release-asset@v1.0.1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -193,7 +191,7 @@ jobs:
         asset_content_type: application/octet-stream
 
     - name: Upload xzip tarball
-      if: matrix.os == 'ubuntu-22.04'
+      if: matrix.os == 'ubuntu-latest'
       uses: actions/upload-release-asset@v1.0.1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -204,7 +202,7 @@ jobs:
         asset_content_type: application/octet-stream
 
     - name: Upload zst tarball
-      if: matrix.os == 'ubuntu-22.04'
+      if: matrix.os == 'ubuntu-latest'
       uses: actions/upload-release-asset@v1.0.1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,3 +1,29 @@
+2026-05-19  Michael Herstine  <sp1ff@pobox.com>
+
+	Cut release 0.3.0
+
+	Tidying commit; update README.org & the CI script.
+
+	Updated to the Rust 2024 edition, ran "cargo update"
+
+	Update copyrights
+
+2025-09-03  Michael Herstine  <sp1ff@pobox.com>
+
+	Add a '-p' flag for disabling ANSI escape codes in output.
+
+2025-09-02  Michael Herstine  <sp1ff@pobox.com>
+
+	Check config for the token.
+	This small patch adds logic to check configuration for the
+	API key (after the command line & the environment).
+
+2025-04-10  Michael Herstine  <sp1ff@pobox.com>
+
+	Fix the release workflow.
+	Update the upload-artifacts & download-artifacts actions version
+	numbers.
+
 2025-04-09  Michael Herstine  <sp1ff@pobox.com>
 
 	Cut release 0.2.9

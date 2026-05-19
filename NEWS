@@ -1,5 +1,11 @@
 pin News -- history of user-visible changes           -*- outline -*-
 
+* 0.3. builds
+
+** 0.3.0
+
+*** Add a '-p' flag for disabling ANSI escape codes in output
+*** Check config for the token
 * 0.2 builds
 
 ** 0.2.9
