@@ -2,7 +2,7 @@
 #+DESCRIPTION: A command-line Pinboard client
 #+AUTHOR: Michael Herstine
 #+EMAIL: <sp1ff@pobox.com>
-#+DATE: <2025-04-09 Wed 11:20>
+#+DATE: <2026-05-19 Tue 08:39>
 #+AUTODATE: t
 #+STARTUP: overview
 
@@ -63,7 +63,7 @@ Type =pin --help= for a description of all flags & sub-commands.
 [[https://github.com/sp1ff/pin][pin]] is GPL v3 software.
 * Prerequistes
 
-The Rust [[https://rustup.rs/][toolchain]] (Rust version 1.81 at minimum).
+The Rust [[https://rustup.rs/][toolchain]] (Rust version 1.88 at minimum) & a Pinboard.in API [[https://pinboard.in/api][token]].
 * Installation
 
 This crate is available on [[https://crates.io][crates.io]], but you can also download an Autotools tarball:
